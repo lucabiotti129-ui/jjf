@@ -2,7 +2,7 @@ import * as api from './api.js';
 import * as ygo from './yugioh.js';
 import { readCard, readYugioh, readText, warmUp } from './ocr.js';
 import { rankByImage } from './images.js';
-import { findCard, warmUpCrop, rotate180 } from './cardcrop.js';
+import { findCard, locateCard, warpCard, cardQuality, cropReady, warmUpCrop, rotate180 } from './cardcrop.js';
 import { checkPokemon, checkYugioh, MANUAL_TIPS } from './fakecheck.js';
 import { savePhoto, photoUrl, deletePhoto, clearPhotos } from './photos.js';
 import { collection, prefs } from './store.js';
@@ -70,8 +70,8 @@ function tile({ name, sub, image, photoId, price, qty, priceLabel, badge, match,
       ${qty > 1 ? `<span class="qty-badge">${qty}×</span>` : ''}
       ${match != null ? `<span class="match-badge ${match >= 80 ? '' : match >= 55 ? 'mid' : 'low'}">${match} %</span>` : ''}
     </div>
-    <div class="tile-name">${esc(name)}</div>
     ${sub ? `<div class="tile-sub">${esc(sub)}</div>` : ''}
+    <div class="tile-name">${esc(name)}</div>
     ${priceLabel !== undefined ? `<div class="tile-price ${price == null ? 'na' : ''}">${esc(priceLabel)}</div>` : ''}`;
   const img = el.querySelector('img');
   if (img) {
@@ -105,6 +105,9 @@ function renderCollection() {
     ch.textContent = '';
   }
   ch.previousElementSibling.hidden = !ch.textContent;
+
+  document.body.dataset.game = collectionGame;
+  showHeroArt(items.filter(i => collectionGame === 'all' || i.game === collectionGame));
 
   $$('#game-chips .chip').forEach(c => {
     const g = c.dataset.game;
@@ -152,6 +155,29 @@ function renderCollection() {
   }));
 }
 
+/** Titelbild wie ein großes Spielplakat: die wertvollste Karte der Kategorie. */
+let heroKey = '';
+async function showHeroArt(list) {
+  const art = $('#hero-art');
+  const top = [...list].filter(i => i.image || i.photoId).sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
+  const key = top ? top.key : '';
+  if (key === heroKey) return;
+  heroKey = key;
+  if (!top) { art.style.backgroundImage = ''; delete art.dataset.art; return; }
+  let url = '';
+  if (top.game === 'pokemon') url = `${top.image}/high.webp`;
+  else if (top.game === 'yugioh') url = top.image.replace('/cards_small/', '/cards/');
+  else url = await photoUrl(top.photoId);
+  if (!url || heroKey !== key) return;
+  const img = new Image();
+  img.onload = () => {
+    if (heroKey !== key) return;
+    art.dataset.art = isSport(top.game) ? 'photo' : top.game;
+    art.style.backgroundImage = `url("${url}")`;
+  };
+  img.src = url;
+}
+
 function subOf(i) {
   if (i.game === 'pokemon') return `${i.setName} · ${variantLabel(i.variant)}`;
   if (i.game === 'yugioh') return `${i.localId || ''} · ${i.variantLabel || ''}`;
@@ -197,7 +223,7 @@ $('#btn-refresh').addEventListener('click', async () => {
   await Promise.all([worker(), worker(), worker(), worker()]);
   collection.updatePrices(updates);
   btn.classList.remove('spinning');
-  label.textContent = 'Preise aktualisieren';
+  label.textContent = 'Aktualisieren';
   toast(failed ? `${failed} Preise konnten nicht geladen werden` : 'Preise sind aktuell');
 });
 
@@ -634,12 +660,15 @@ function guessName(text) {
 
 /* ---------------- Kamera ---------------- */
 const video = $('#video');
+const overlay = $('#overlay');
 let stream = null;
 let torchOn = false;
+let caps = {};
 
 async function startCamera() {
   $('#camera-error').hidden = true;
   if (stream) return;
+  liveStatus('Kamera startet …');
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('unsupported');
     stream = await navigator.mediaDevices.getUserMedia({
@@ -650,9 +679,16 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play().catch(() => {});
     const track = stream.getVideoTracks()[0];
-    const caps = track.getCapabilities?.() || {};
+    caps = track.getCapabilities?.() || {};
     $('#btn-torch').hidden = !caps.torch;
-    if (caps.focusMode?.includes('continuous')) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+    // Dauerhaft scharf stellen, belichten und Weißabgleich, wenn das Handy es kann
+    const auto = {};
+    if (caps.focusMode?.includes('continuous')) auto.focusMode = 'continuous';
+    if (caps.exposureMode?.includes('continuous')) auto.exposureMode = 'continuous';
+    if (caps.whiteBalanceMode?.includes('continuous')) auto.whiteBalanceMode = 'continuous';
+    if (Object.keys(auto).length) track.applyConstraints({ advanced: [auto] }).catch(() => {});
+    setupZoom(track);
+    startLive();
   } catch (err) {
     stream = null;
     $('#camera-error-text').textContent = err?.name === 'NotAllowedError'
@@ -663,10 +699,13 @@ async function startCamera() {
 }
 
 function stopCamera() {
+  stopLive();
   stream?.getTracks().forEach(t => t.stop());
   stream = null;
   torchOn = false;
+  caps = {};
   $('#btn-torch').classList.remove('on');
+  $('#zoom-ctrl').hidden = true;
   video.srcObject = null;
 }
 function resumeCamera() { if (video.paused && stream) video.play().catch(() => {}); }
@@ -680,21 +719,66 @@ $('#btn-torch').onclick = async () => {
   $('#btn-torch').classList.toggle('on', torchOn);
 };
 
-/** Schneidet den Bereich des Rahmens (plus Rand) aus dem Kamerabild aus. */
-function captureFrame(padFactor = 0.02) {
+/** Zoom-Stufen 1× / 2× / 3× – mit Zoom kann man weiter weg bleiben, dann stellt die Kamera besser scharf. */
+function setupZoom(track) {
+  const box = $('#zoom-ctrl');
+  const z = caps.zoom;
+  if (!z || !(z.max > z.min)) { box.hidden = true; return; }
+  const levels = [1, 2, 3].map(f => z.min * f).filter(v => v <= z.max + 1e-6);
+  let active = track.getSettings?.().zoom ?? z.min;
+  box.innerHTML = levels.map(v => `<button data-z="${v}">${Math.round(v / z.min)}×</button>`).join('');
+  const mark = () => box.querySelectorAll('button').forEach(b => b.classList.toggle('on', Math.abs(parseFloat(b.dataset.z) - active) < 0.05));
+  box.querySelectorAll('button').forEach(b => b.onclick = async () => {
+    active = parseFloat(b.dataset.z);
+    mark();
+    await track.applyConstraints({ advanced: [{ zoom: active }] }).catch(() => {});
+  });
+  mark();
+  box.hidden = false;
+}
+
+/** Abbildung Kamerabild ↔ Bildschirm (das Video füllt den Bildschirm wie object-fit: cover). */
+function videoBox() {
   const vw = video.videoWidth, vh = video.videoHeight;
-  if (!vw) return null;
-  const vr = video.getBoundingClientRect();
+  const r = video.getBoundingClientRect();
+  const scale = Math.max(r.width / vw, r.height / vh);
+  return { vw, vh, r, scale, offX: (r.width - vw * scale) / 2, offY: (r.height - vh * scale) / 2 };
+}
+
+/** Antippen zum Scharfstellen auf genau diese Stelle. */
+video.addEventListener('click', async e => {
+  const track = stream?.getVideoTracks()[0];
+  if (!track || !video.videoWidth) return;
+  const b = videoBox();
+  const ring = $('#focus-ring');
+  ring.hidden = true;
+  ring.style.left = `${e.clientX - b.r.left}px`;
+  ring.style.top = `${e.clientY - b.r.top}px`;
+  void ring.offsetWidth;
+  ring.hidden = false;
+  clearTimeout(ring._t);
+  ring._t = setTimeout(() => { ring.hidden = true; }, 1200);
+  const x = Math.min(1, Math.max(0, (e.clientX - b.r.left - b.offX) / b.scale / b.vw));
+  const y = Math.min(1, Math.max(0, (e.clientY - b.r.top - b.offY) / b.scale / b.vh));
+  const mode = caps.focusMode?.includes('single-shot') ? 'single-shot' : caps.focusMode?.includes('continuous') ? 'continuous' : null;
+  try {
+    await track.applyConstraints({ advanced: [{ pointsOfInterest: [{ x, y }], ...(mode ? { focusMode: mode } : {}) }] });
+    if (mode === 'single-shot') setTimeout(() => track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {}), 2500);
+  } catch { /* Handy unterstützt keinen Fokuspunkt */ }
+});
+
+/** Schneidet den Bereich des Rahmens (plus Rand) aus dem Kamerabild aus – letzter Ausweg. */
+function captureFrame(padFactor = 0.02) {
+  if (!video.videoWidth) return null;
+  const b = videoBox();
   const fr = $('#scan-frame').getBoundingClientRect();
-  const scale = Math.max(vr.width / vw, vr.height / vh);
-  const offX = (vr.width - vw * scale) / 2, offY = (vr.height - vh * scale) / 2;
   const pad = padFactor * fr.width;
-  let sx = (fr.left - vr.left - offX - pad) / scale;
-  let sy = (fr.top - vr.top - offY - pad) / scale;
-  let sw = (fr.width + pad * 2) / scale;
-  let sh = (fr.height + pad * 2) / scale;
+  let sx = (fr.left - b.r.left - b.offX - pad) / b.scale;
+  let sy = (fr.top - b.r.top - b.offY - pad) / b.scale;
+  let sw = (fr.width + pad * 2) / b.scale;
+  let sh = (fr.height + pad * 2) / b.scale;
   sx = Math.max(0, sx); sy = Math.max(0, sy);
-  sw = Math.min(vw - sx, sw); sh = Math.min(vh - sy, sh);
+  sw = Math.min(b.vw - sx, sw); sh = Math.min(b.vh - sy, sh);
   const c = document.createElement('canvas');
   c.width = Math.round(sw); c.height = Math.round(sh);
   c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, c.width, c.height);
@@ -702,34 +786,49 @@ function captureFrame(padFactor = 0.02) {
 }
 
 /**
- * Bild für den Scan aufnehmen: wenn möglich ein Foto in voller Kamera-Auflösung,
- * sonst das Videobild. In beiden Fällen wird die Karte im Bild gesucht und gerade ausgeschnitten.
+ * Bild für den Scan aufnehmen und die Karte gerade ausschneiden:
+ * 1. Foto in voller Kamera-Auflösung (ohne Blitz – der spiegelt auf Karten),
+ * 2. sonst das Videobild mit dem live gefundenen Rahmen,
+ * 3. sonst der Bereich des Rahmens.
  */
-async function captureForScan() {
+async function captureForScan(quad) {
   const track = stream?.getVideoTracks()[0];
   if (track && 'ImageCapture' in window) {
     try {
+      const ic = new ImageCapture(track);
+      const settings = {};
+      try {
+        const pc = await ic.getPhotoCapabilities();
+        if (pc?.imageWidth?.max) Object.assign(settings, { imageWidth: pc.imageWidth.max, imageHeight: pc.imageHeight?.max });
+        if (pc?.fillLightMode?.includes('off')) settings.fillLightMode = 'off';
+      } catch { /* Standard-Einstellungen */ }
       const blob = await Promise.race([
-        new ImageCapture(track).takePhoto(),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Zeitüberschreitung')), 4000)),
+        ic.takePhoto(settings),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Zeitüberschreitung')), 4500)),
       ]);
-      const photo = await imageToCanvas(blob);
+      const photo = await imageToCanvas(blob, 3000);
       const found = await findCard(photo);
-      if (found.found) return { canvas: found.canvas, cropped: true };
+      if (found.found) return found.canvas;
     } catch { /* weiter mit dem Videobild */ }
   }
-  const wide = captureFrame(0.18);
-  if (!wide) return null;
-  const found = await findCard(wide);
-  return found.found ? { canvas: found.canvas, cropped: true } : { canvas: captureFrame(0.02), cropped: true };
+  if (!video.videoWidth) return null;
+  const frame = document.createElement('canvas');
+  frame.width = video.videoWidth;
+  frame.height = video.videoHeight;
+  frame.getContext('2d').drawImage(video, 0, 0);
+  if (quad && performance.now() - quad.at < 1500) {
+    try { return await warpCard(frame, quad.corners); } catch { /* unten weiter */ }
+  }
+  const found = await findCard(frame);
+  return found.found ? found.canvas : captureFrame(0.02);
 }
 
-function imageToCanvas(file) {
+function imageToCanvas(file, maxSide = 2400) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const s = Math.min(1, 2400 / Math.max(img.width, img.height));
+      const s = Math.min(1, maxSide / Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
@@ -741,35 +840,183 @@ function imageToCanvas(file) {
   });
 }
 
+/* ---------------- Live-Erkennung im Kamerabild ---------------- */
+const SHARP_MIN = 0.35;  // Schärfe (Laplace-Varianz ÷ Kontrast) – scharf ≈ 2–4, darunter ist die Schrift zu weich
+// Anteil fast weißer Pixel. Helle Karten haben schon ohne Spiegelung bis ~11 % – nur große Lichtflecken melden
+const GLARE_MAX = 0.18;
+const STEADY = 0.012;    // maximale Bewegung der Ecken pro Bild (Anteil der Bilddiagonale)
+const HOLD_MS = 900;     // so lange muss die Karte ruhig und scharf sein, bis Auto-Scan auslöst
+const live = { running: false, timer: null, prev: null, steadySince: 0, quad: null, locked: false, misses: 0, small: document.createElement('canvas') };
+let autoScan = prefs.get('autoScan') ?? true;
+
+function liveStatus(text, state = '') {
+  const el = $('#live-status');
+  if (el.textContent !== text) el.textContent = text;
+  el.className = `live-status ${state}`;
+}
+
+function setShutterProgress(p) {
+  $('#shutter-progress').style.strokeDashoffset = String(258 * (1 - p));
+  $('#btn-shutter').classList.toggle('armed', p > 0);
+}
+
+function drawQuad(corners, state) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(overlay.clientWidth * dpr), h = Math.round(overlay.clientHeight * dpr);
+  if (overlay.width !== w || overlay.height !== h) { overlay.width = w; overlay.height = h; }
+  const ctx = overlay.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  $('.scanner').classList.toggle('tracking', !!corners);
+  if (!corners) return;
+  const b = videoBox();
+  const pts = corners.map(p => ({ x: (p.x * b.scale + b.offX) * dpr, y: (p.y * b.scale + b.offY) * dpr }));
+  const color = state === 'ok' ? '61, 220, 132' : '255, 209, 92';
+  ctx.beginPath();
+  pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${color}, .14)`;
+  ctx.fill();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 3 * dpr;
+  ctx.strokeStyle = `rgb(${color})`;
+  ctx.stroke();
+  ctx.fillStyle = `rgb(${color})`;
+  pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 5 * dpr, 0, Math.PI * 2); ctx.fill(); });
+}
+
+function startLive() {
+  if (live.running) return;
+  live.running = true;
+  live.prev = null;
+  live.steadySince = 0;
+  warmUpCrop();
+  liveTick();
+}
+
+function stopLive() {
+  live.running = false;
+  clearTimeout(live.timer);
+  live.quad = null;
+  drawQuad(null);
+  setShutterProgress(0);
+}
+
+async function liveTick() {
+  if (!live.running) return;
+  const ready = current === 'scan' && stream && !busy && $('#sheet').hidden && !video.paused && video.videoWidth;
+  if (!ready) { live.timer = setTimeout(liveTick, 300); return; }
+  if (!cropReady()) { liveStatus('Bilderkennung lädt …'); live.timer = setTimeout(liveTick, 300); return; }
+  const t0 = performance.now();
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const s = Math.min(1, 480 / Math.max(vw, vh));
+  const sm = live.small;
+  sm.width = Math.round(vw * s);
+  sm.height = Math.round(vh * s);
+  sm.getContext('2d').drawImage(video, 0, 0, sm.width, sm.height);
+  const quad = await locateCard(sm, { maxSide: 480, minArea: 0.05 });
+  if (!live.running) return;
+
+  if (quad) {
+    const corners = quad.corners.map(p => ({ x: p.x / s, y: p.y / s }));
+    const q = cardQuality(await warpCard(sm, quad.corners, 160, 224));
+    if (!live.running) return; // Kamera wurde inzwischen verlassen
+    const move = live.prev
+      ? Math.max(...corners.map((p, i) => Math.hypot(p.x - live.prev[i].x, p.y - live.prev[i].y))) / Math.hypot(vw, vh)
+      : 1;
+    live.prev = corners;
+    live.quad = { corners, at: performance.now() };
+
+    live.misses = 0;
+    // Nach einem Scan erst wieder auslösen, wenn eine neue Karte kommt (oder die alte deutlich bewegt wurde)
+    if (live.locked && move > 0.15) live.locked = false;
+
+    let state = 'ok', msg = 'Erkannt – stillhalten';
+    if (quad.area < 0.1) { state = 'warn'; msg = 'Etwas näher ran'; }
+    else if (q.glare > GLARE_MAX) { state = 'warn'; msg = 'Spiegelung – Karte kippen'; }
+    else if (q.sharpness < SHARP_MIN) { state = 'warn'; msg = 'Unscharf – stillhalten'; }
+    if (state === 'ok' && move < STEADY && !live.locked) live.steadySince ||= performance.now();
+    else live.steadySince = 0;
+    const held = live.steadySince ? (performance.now() - live.steadySince) / HOLD_MS : 0;
+
+    drawQuad(corners, state);
+    if (live.locked && state === 'ok') msg = 'Gescannt – nächste Karte';
+    else if (autoScan && state === 'ok' && live.steadySince) msg = 'Erkannt – Scan startet';
+    liveStatus(msg, state);
+    setShutterProgress(autoScan ? Math.min(1, held) : 0);
+    if (autoScan && held >= 1) {
+      live.steadySince = 0;
+      live.locked = true;
+      setShutterProgress(0);
+      await shoot();
+      live.timer = setTimeout(liveTick, 400);
+      return;
+    }
+  } else {
+    // Zwei Bilder ohne Karte: die alte Karte ist weg, Auto-Scan ist wieder bereit
+    if (++live.misses >= 2) live.locked = false;
+    live.prev = null;
+    live.steadySince = 0;
+    live.quad = null;
+    drawQuad(null);
+    liveStatus('Karte ins Bild halten');
+    setShutterProgress(0);
+  }
+  live.timer = setTimeout(liveTick, Math.max(60, 170 - (performance.now() - t0)));
+}
+
+/** Auslösen: Foto aufnehmen, Karte ausschneiden, erkennen. */
+async function shoot() {
+  if (busy) return;
+  const quad = live.quad;
+  setStatus('Foto wird aufgenommen …', 0.01);
+  const card = await captureForScan(quad).catch(() => null);
+  setStatus(null);
+  if (card) await scan(card, true);
+}
+
+$('#btn-auto').onclick = () => {
+  autoScan = !autoScan;
+  prefs.set('autoScan', autoScan);
+  $('#btn-auto').classList.toggle('on', autoScan);
+  $('#btn-auto').setAttribute('aria-pressed', String(autoScan));
+  toast(autoScan ? 'Auto-Scan an: Die App löst selbst aus' : 'Auto-Scan aus: Tippe selbst auf den Auslöser');
+};
+$('#btn-auto').classList.toggle('on', autoScan);
+$('#btn-auto').setAttribute('aria-pressed', String(autoScan));
+
 /* ---------------- Scan-Modus ---------------- */
 let scanMode = prefs.get('scanMode') || 'pokemon';
 const MODE_UI = {
-  pokemon: { name: 'Name', number: 'Nr. 025/165', hint: 'Karte in den Rahmen legen – die Nummer unten muss lesbar sein' },
-  yugioh: { name: 'Name', number: 'LOB-DE001', hint: 'Karte in den Rahmen legen – der Set-Code unter dem Bild muss lesbar sein' },
-  sport: { name: '', number: '', hint: 'Ganze Karte in den Rahmen legen – Foto und Name werden übernommen' },
+  pokemon: 'Karte auf einen dunklen Untergrund legen – Nummer unten muss lesbar sein',
+  yugioh: 'Karte auf einen dunklen Untergrund legen – Set-Code unter dem Bild muss lesbar sein',
+  sport: 'Ganze Karte ins Bild halten – Foto und Name werden übernommen',
 };
 function setScanMode(mode) {
   scanMode = mode;
   prefs.set('scanMode', mode);
   $$('#scan-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-  const sc = $('.scanner');
-  sc.classList.remove('mode-pokemon', 'mode-yugioh', 'mode-sport');
-  sc.classList.add(`mode-${mode}`);
-  $('#zone-name').textContent = MODE_UI[mode].name;
-  $('#zone-number').textContent = MODE_UI[mode].number;
-  $('#scan-hint').textContent = MODE_UI[mode].hint;
+  $('#scan-hint').textContent = MODE_UI[mode];
 }
 $$('#scan-mode button').forEach(b => b.onclick = () => setScanMode(b.dataset.mode));
 
 /* ---------------- Scan-Ablauf ---------------- */
 let busy = false;
 
-function setStatus(text, progress) {
+function setStatus(text, progress, card = null) {
   const s = $('#scan-status');
   s.hidden = text == null;
   $('.scanner').classList.toggle('busy', text != null);
   if (text != null) $('#scan-status-text').textContent = text;
   if (progress != null) $('#scan-progress').style.width = `${Math.round(progress * 100)}%`;
+  const thumb = $('#scan-thumb');
+  if (text == null) thumb.hidden = true;
+  else if (card) {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = Math.round(card.height * 128 / card.width);
+    c.getContext('2d').drawImage(card, 0, 0, c.width, c.height);
+    thumb.src = c.toDataURL('image/jpeg', 0.8);
+    thumb.hidden = false;
+  }
 }
 
 async function scan(source, cropped = false) {
@@ -779,10 +1026,14 @@ async function scan(source, cropped = false) {
   video.pause();
   try {
     let canvas = source;
-    if (!cropped) {
+    // Hat das Bild selbst schon Kartenformat (63 : 88), ist es bereits zugeschnitten –
+    // sonst würde die Suche ein Rechteck innerhalb der Karte finden (z. B. den Bildrahmen)
+    const ratio = Math.min(source.width, source.height) / Math.max(source.width, source.height);
+    if (!cropped && (ratio < 0.69 || ratio > 0.745)) {
       setStatus('Karte wird im Foto gesucht …', 0.02);
       canvas = (await findCard(source)).canvas;
     }
+    setStatus('Karte wird gelesen …', 0.03, canvas);
     if (scanMode === 'sport') await scanSport(canvas);
     else if (scanMode === 'yugioh') await scanYugioh(canvas);
     else await scanPokemon(canvas);
@@ -869,7 +1120,7 @@ function showNotFound(game, guess, scan = null) {
     <div class="list">
       <div class="list-item"><div><b>Richtige Kartenart?</b><small>Oben im Scanner Pokémon, Yu-Gi-Oh! oder Sport wählen</small></div></div>
       <div class="list-item"><div><b>Gutes Licht</b><small>Keine Spiegelungen auf der Karte – Hülle wenn möglich entfernen</small></div></div>
-      <div class="list-item"><div><b>Karte füllt den Rahmen</b><small>Gerade halten, nicht zu weit weg</small></div></div>
+      <div class="list-item"><div><b>Dunkler Untergrund</b><small>Karte auf einen dunklen Tisch oder Stoff legen – dann findet die App die Ränder</small></div></div>
       <div class="list-item"><div><b>Scharf halten</b><small>${what} muss lesbar sein – kurz stillhalten</small></div></div>
     </div>
     <div class="actions">
@@ -886,13 +1137,7 @@ function showNotFound(game, guess, scan = null) {
   };
 }
 
-$('#btn-shutter').onclick = async () => {
-  if (busy) return;
-  setStatus('Foto wird aufgenommen …', 0.01);
-  const shot = await captureForScan().catch(() => null);
-  setStatus(null);
-  if (shot) scan(shot.canvas, shot.cropped);
-};
+$('#btn-shutter').onclick = () => { live.locked = true; shoot(); };
 const pickPhoto = () => $('#file-input').click();
 $('#btn-gallery').onclick = pickPhoto;
 $('#btn-gallery-2').onclick = pickPhoto;

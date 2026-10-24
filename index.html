@@ -3,742 +3,574 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0d12">
+  <meta name="theme-color" content="#000000">
   <title>CardVault – Karten scannen, Wert erfahren, Fälschungen erkennen</title>
-  <meta name="description" content="Scanne Pokémon-, Yu-Gi-Oh!-, Fußball- und Football-Karten mit dem Handy. Live-Preise, Echtheits-Check und deine Sammlung mit Gesamtwert. Kostenlose Android-App.">
+  <meta name="description" content="Scanne Pokémon-, Yu-Gi-Oh!-, Fußball- und Football-Karten mit dem Handy. Live-Kamera mit Auto-Scan, Marktpreise, Echtheits-Check und Sammlung mit Gesamtwert. Kostenlos für Android und iPhone.">
   <meta property="og:title" content="CardVault – Karten scannen & Wert erfahren">
-  <meta property="og:description" content="Pokémon, Yu-Gi-Oh!, Fußball & Football: scannen, Preis sehen, Echtheit prüfen. Kostenlos für Android und iPhone.">
+  <meta property="og:description" content="Live-Kamera mit Auto-Scan, Marktpreise und Echtheits-Check. Kostenlos für Android und iPhone.">
   <link rel="icon" href="icon.svg">
+  <link rel="preload" href="fonts/inter-tight.woff2" as="font" type="font/woff2" crossorigin>
   <style>
+    /* Kino-Look: schwarze Fläche, randlose farbige Bildbänder, fette enge Schrift, kleine Großbuchstaben, Pillen-Knöpfe */
+    @font-face { font-family: "Inter Tight"; src: url("fonts/inter-tight.woff2") format("woff2"); font-weight: 600 900; font-display: swap; }
+    @font-face { font-family: "Inter"; src: url("fonts/inter.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
     :root {
-      --bg: #08090d; --bg-2: #0d1017; --surface: #12161f; --surface-2: #191f2c; --surface-3: #232a3b;
-      --line: rgba(255,255,255,.08); --line-2: rgba(255,255,255,.14);
-      --text: #f5f7fc; --soft: #c2c8d6; --muted: #8790a5;
-      --gold: #ffcb05; --grad: linear-gradient(135deg, #ffe066 0%, #ffb000 50%, #ff7a00 100%);
-      --green: #2fd47a; --red: #ff5470; --blue: #4c8dff; --violet: #9b6bff;
-      --radius: 24px;
+      --ink: #000; --panel: #111113; --card: #1a1a1d; --raise: #26262a;
+      --line: rgba(255,255,255,.1); --line-2: rgba(255,255,255,.2);
+      --text: #fdfdfd; --soft: rgba(255,255,255,.8); --muted: rgba(255,255,255,.56);
+      --gold: #ffd15c; --violet: #c7a8ff; --mint: #8fe3b0; --coral: #ffab9c; --green: #3ddc84; --red: #ff5d73;
+      --display: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --body: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --gutter: max(20px, env(safe-area-inset-left, 0px));
       color-scheme: dark;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body {
-      margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
-      font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
+    body { margin: 0; background: var(--ink); color: var(--text); font: 17px/1.55 var(--body); letter-spacing: -.005em; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: inherit; }
     img { max-width: 100%; display: block; }
-    h1, h2, h3 { margin: 0; letter-spacing: -.03em; line-height: 1.08; }
-    .wrap { max-width: 1160px; margin: 0 auto; padding-inline: 20px; }
-    svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
-    .grad-text { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
-
-    /* Hintergrund-Leuchten */
-    .glow { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; opacity: .5; }
+    h1, h2, h3 { margin: 0; font-family: var(--display); font-weight: 800; letter-spacing: -.03em; line-height: 1.04; text-wrap: balance; }
+    p { margin: 0; }
+    .wrap { max-width: 1240px; margin: 0 auto; padding-left: var(--gutter); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+    .eyebrow { font: 700 12.5px/1.2 var(--body); letter-spacing: .09em; text-transform: uppercase; color: var(--soft); }
+    svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 
     /* Navigation */
-    nav {
-      position: sticky; top: 0; z-index: 50;
-      padding-top: env(safe-area-inset-top, 0px);
-      background: rgba(8,9,13,.72); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4);
-      border-bottom: 1px solid var(--line);
-    }
-    nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 66px; gap: 16px; }
-    .logo { display: flex; align-items: center; gap: 10px; font-weight: 850; font-size: 20px; text-decoration: none; letter-spacing: -.02em; }
+    body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: #000; z-index: 60; }
+    nav { position: fixed; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 50; transition: background .3s ease, border-color .3s ease; border-bottom: 1px solid transparent; }
+    nav.solid { background: rgba(0,0,0,.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-color: var(--line); }
+    nav .wrap { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 68px; gap: 16px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 800 15px var(--display); letter-spacing: .08em; text-transform: uppercase; }
     .logo img { width: 34px; height: 34px; }
-    .nav-links { display: flex; gap: 28px; font-size: 15px; color: var(--muted); font-weight: 600; }
-    .nav-links a { text-decoration: none; transition: color .15s; }
-    .nav-links a:hover { color: var(--text); }
+    .nav-links { display: flex; gap: 30px; }
+    .nav-links a { text-decoration: none; font: 700 13px var(--body); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.8); transition: color .15s; }
+    .nav-links a:hover { color: #fff; }
+    .nav-cta { justify-self: end; }
 
-    /* Buttons */
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-      height: 52px; padding: 0 26px; border-radius: 16px; border: 0; cursor: pointer;
-      font: inherit; font-weight: 750; font-size: 17px; text-decoration: none;
-      transition: transform .18s ease, box-shadow .18s ease;
-    }
-    .btn:hover { transform: translateY(-2px); }
+    /* Knöpfe */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 26px; border-radius: 999px; font: 700 17px var(--body); letter-spacing: -.01em; text-decoration: none; border: 0; cursor: pointer; transition: transform .15s ease, background .15s ease; white-space: nowrap; }
+    .btn:hover { transform: translateY(-1px); }
     .btn:active { transform: scale(.98); }
-    .btn.primary { background: var(--grad); color: #1d1300; box-shadow: 0 14px 34px -12px rgba(255,150,0,.75), inset 0 1px 0 rgba(255,255,255,.5); }
-    .btn.primary:hover { box-shadow: 0 18px 44px -12px rgba(255,150,0,.9), inset 0 1px 0 rgba(255,255,255,.5); }
-    .btn.ghost { background: rgba(255,255,255,.06); border: 1px solid var(--line-2); color: var(--text); box-shadow: none; }
-    .btn.ghost:hover { background: rgba(255,255,255,.1); }
-    .btn.small { height: 42px; padding: 0 18px; font-size: 15px; border-radius: 12px; }
-    .btn.big { height: 64px; padding: 0 34px; font-size: 19px; border-radius: 20px; }
-    .btn .sub { display: block; font-size: 12px; font-weight: 600; opacity: .7; margin-top: -2px; }
-    .btn .two { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+    .btn.white { background: #fff; color: #000; }
+    .btn.tint { background: var(--tint, var(--gold)); color: #000; }
+    .btn.outline { border: 1.5px solid rgba(255,255,255,.85); color: #fff; }
+    .btn.outline:hover { background: rgba(255,255,255,.08); }
+    .btn.small { height: 40px; padding: 0 18px; font-size: 14px; }
 
-    /* Hero */
-    .hero { position: relative; padding: 64px 0 80px; overflow: hidden; }
-    .hero .wrap { position: relative; display: grid; grid-template-columns: 1.05fr .95fr; gap: 40px; align-items: center; }
-    .pill {
-      display: inline-flex; align-items: center; gap: 10px; padding: 6px 14px 6px 6px; border-radius: 999px;
-      background: rgba(255,203,5,.08); border: 1px solid rgba(255,203,5,.25); color: #ffe48a;
-      font-size: 14px; font-weight: 650; margin-bottom: 24px;
-    }
-    .pill b { background: var(--grad); color: #1d1300; padding: 3px 10px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
-    .hero h1 { font-size: clamp(42px, 6.4vw, 76px); font-weight: 900; }
-    .hero p.lead { font-size: 19px; color: var(--soft); margin: 22px 0 26px; max-width: 540px; }
-    .games { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 30px; }
-    .game {
-      display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 12px;
-      background: var(--surface); border: 1px solid var(--line); font-weight: 700; font-size: 14px;
-    }
-    .game i { width: 10px; height: 10px; border-radius: 3px; }
-    .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
-    .qr {
-      display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 10px; border-radius: 18px;
-      background: var(--surface); border: 1px solid var(--line);
-    }
-    .qr-code { width: 76px; height: 76px; border-radius: 10px; background: #fff; padding: 5px; }
-    .qr-code svg { width: 100%; height: 100%; display: block; }
-    .qr small { color: var(--muted); font-size: 13px; line-height: 1.4; display: block; max-width: 140px; }
-    .qr b { font-size: 14px; }
-    .qr-pair { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
-    .qr-item {
-      display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 10px; border-radius: 18px;
-      background: var(--surface); border: 1px solid var(--line);
-    }
-    .qr-item small { color: var(--muted); font-size: 13px; line-height: 1.4; display: block; max-width: 150px; }
-    .qr-item b { font-size: 15px; display: flex; align-items: center; gap: 6px; }
-    .qr-item b svg { width: 18px; height: 18px; }
-    .share-ic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #e8f0fe; color: #1a73e8; vertical-align: -5px; }
-    .share-ic svg { width: 15px; height: 15px; }
-    .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 22px; color: var(--muted); font-size: 14px; }
-    .meta span { display: inline-flex; align-items: center; gap: 6px; }
-    .meta svg { width: 16px; height: 16px; color: var(--green); }
-    .ios-note {
-      margin-top: 20px; padding: 12px 16px; border-radius: 14px; max-width: 540px;
-      background: rgba(255,84,112,.1); border: 1px solid rgba(255,84,112,.3); color: #ffc2cc; font-size: 15px;
-    }
-
-    /* Telefone */
-    .stage { position: relative; aspect-ratio: 1 / 1.08; width: 100%; max-width: 560px; justify-self: end; perspective: 1400px; }
-    .phone {
-      position: absolute; aspect-ratio: 375 / 812; border-radius: 44px; padding: 9px;
-      background: linear-gradient(160deg, #2d3446, #10131b); border: 1px solid rgba(255,255,255,.14);
-      box-shadow: 0 50px 90px -30px rgba(0,0,0,.95), inset 0 0 0 2px rgba(255,255,255,.04);
-    }
+    /* Titelbild mit Bildwechsler */
+    .hero { position: relative; height: min(920px, max(640px, 100svh)); overflow: hidden; background: #000; }
+    .slide { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity .9s ease, visibility .9s; isolation: isolate; }
+    .slide.on { opacity: 1; visibility: visible; }
+    .slide::before { content: ""; position: absolute; inset: 0; z-index: -2;
+      background: radial-gradient(70% 80% at 72% 38%, color-mix(in srgb, var(--tint) 55%, transparent), transparent 70%), radial-gradient(60% 60% at 15% 85%, color-mix(in srgb, var(--tint) 22%, transparent), transparent 70%), linear-gradient(180deg, color-mix(in srgb, var(--tint) 18%, #000), #000 88%); }
+    .slide::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.35), transparent 22%, transparent 55%, rgba(0,0,0,.9) 92%, #000); }
+    .slide[data-tint="gold"] { --tint: #f2a900; }
+    .slide[data-tint="red"] { --tint: #e8384f; }
+    .slide[data-tint="violet"] { --tint: #8b5cf6; }
+    .slide .art { position: absolute; right: max(2vw, calc(50% - 600px)); top: 96px; bottom: 0; width: min(54vw, 640px); }
+    .phone { position: absolute; aspect-ratio: 375 / 812; border-radius: 44px; padding: 9px; background: linear-gradient(160deg, #2c2f38, #0d0e12); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 60px 120px -40px rgba(0,0,0,1); }
     .phone img { width: 100%; height: 100%; object-fit: cover; object-position: top; border-radius: 35px; }
-    .phone::before { content: ""; position: absolute; top: 18px; left: 50%; width: 22%; height: 18px; margin-left: -11%; border-radius: 10px; background: #05060a; z-index: 2; }
-    .stage .p1 { width: 47%; left: 26.5%; top: 0; z-index: 3; transform: rotateY(-4deg); }
-    .stage .p2 { width: 40%; left: 0; top: 13%; z-index: 2; transform: rotate(-8deg); opacity: .9; }
-    .stage .p3 { width: 40%; right: 0; top: 13%; z-index: 2; transform: rotate(8deg); opacity: .9; }
-    .float {
-      position: absolute; z-index: 4; display: flex; align-items: center; gap: 10px;
-      padding: 10px 14px; border-radius: 16px; font-weight: 750; font-size: 14px; white-space: nowrap;
-      background: rgba(18,22,31,.85); border: 1px solid var(--line-2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-      box-shadow: 0 18px 40px -16px rgba(0,0,0,.8);
-      animation: bob 5s ease-in-out infinite;
-    }
-    .float .dot { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: 14px; }
-    .float small { display: block; color: var(--muted); font-weight: 600; font-size: 11px; }
-    .f1 { left: -2%; top: 58%; }
-    .f2 { right: -3%; top: 6%; animation-delay: -1.6s; }
-    .f3 { right: 4%; bottom: 4%; animation-delay: -3.2s; }
-    @keyframes bob { 50% { transform: translateY(-10px); } }
+    .phone::before { content: ""; position: absolute; top: 18px; left: 50%; width: 24%; height: 20px; margin-left: -12%; border-radius: 12px; background: #05060a; z-index: 2; }
+    .art .p1 { width: 48%; right: 4%; top: 2%; transform: rotate(4deg); z-index: 2; }
+    .art .p2 { width: 42%; left: 4%; top: 13%; transform: rotate(-6deg); opacity: .92; }
+    .hero-copy { position: absolute; left: 0; right: 0; bottom: 92px; z-index: 3; }
+    .hero-copy .inner { max-width: 600px; display: flex; flex-direction: column; gap: 18px; }
+    .lockup { display: flex; align-items: center; gap: 14px; }
+    .lockup img { width: 64px; height: 64px; }
+    .lockup span { font: 900 30px var(--display); letter-spacing: -.02em; }
+    .hero h1 { font-size: clamp(40px, 5.6vw, 70px); font-weight: 900; }
+    .hero p.lead { color: var(--soft); font-size: 18.5px; max-width: 520px; }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .hero-ctrl { position: absolute; z-index: 4; right: max(20px, calc(50% - 600px)); bottom: 40px; display: flex; align-items: center; gap: 14px; }
+    .pause { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(255,255,255,.12); border: 0; cursor: pointer; }
+    .pause svg { width: 14px; height: 14px; fill: currentColor; stroke: none; }
+    .bars { display: flex; gap: 8px; }
+    .bar { width: 46px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.28); overflow: hidden; cursor: pointer; border: 0; padding: 0; }
+    .bar i { display: block; height: 100%; width: 0; background: #fff; }
+    .bar.done i { width: 100%; }
+    .bar.on i { animation: fill 7s linear forwards; }
+    .hero.paused .bar.on i { animation-play-state: paused; }
+    @keyframes fill { to { width: 100%; } }
+
+    /* Neuigkeiten */
+    section { position: relative; }
+    .block { padding: 96px 0; }
+    .block-head { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+    .block-head h2 { font-size: clamp(32px, 4vw, 48px); }
+    .news { display: grid; grid-template-columns: 1.55fr 1fr; gap: 18px; }
+    .news-big { border-radius: 14px; overflow: hidden; background: var(--card); text-decoration: none; display: flex; flex-direction: column; }
+    .news-big .pic { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: radial-gradient(80% 90% at 70% 30%, rgba(61,220,132,.45), transparent 70%), #0b1a12; }
+    .news-big .pic img { position: absolute; width: 38%; right: 8%; top: 8%; border-radius: 18px; transform: rotate(5deg); box-shadow: 0 30px 60px -20px #000; }
+    .news-big .pic img + img { width: 31%; left: 10%; right: auto; top: 22%; transform: rotate(-6deg); }
+    .news-big .txt { padding: 26px 28px 30px; display: flex; flex-direction: column; gap: 12px; }
+    .news-big h3 { font-size: clamp(24px, 2.6vw, 32px); }
+    .date { color: var(--muted); font-size: 14px; }
+    .news-list { display: flex; flex-direction: column; gap: 18px; }
+    .news-item { display: grid; grid-template-columns: 116px 1fr; gap: 16px; align-items: start; text-decoration: none; }
+    .news-item .thumb { aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--card); }
+    .news-item .thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+    .news-item .meta { display: flex; flex-direction: column; gap: 6px; }
+    .news-item h3 { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; }
+
+    /* Funktions-Bänder (wie Spiele-Abschnitte) */
+    .band { position: relative; min-height: 600px; overflow: hidden; display: flex; align-items: flex-end; isolation: isolate; }
+    .band::before { content: ""; position: absolute; inset: 0; z-index: -2; background: radial-gradient(60% 90% at 75% 40%, color-mix(in srgb, var(--tint) 60%, transparent), transparent 72%), linear-gradient(90deg, color-mix(in srgb, var(--tint) 18%, #000) 0%, color-mix(in srgb, var(--tint) 35%, #000) 100%); }
+    .band::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,.85)); }
+    .band .art { position: absolute; right: max(2vw, calc(50% - 600px)); top: 64px; width: min(42vw, 500px); height: calc(100% + 120px); }
+    .band .art .phone { width: 58%; right: 10%; top: 0; transform: rotate(-3deg); }
+    .band .art .phone + .phone { width: 46%; left: 0; right: auto; top: 18%; transform: rotate(-9deg); }
+    .band > .wrap { width: 100%; }
+    .band-copy { padding-bottom: 60px; max-width: 540px; display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+    .crumb { font-size: 14px; color: var(--muted); }
+    .crumb b { color: #fff; font-weight: 700; }
+    .band h2 { font-size: clamp(36px, 4.6vw, 58px); font-weight: 900; }
+    .band p { color: var(--soft); font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 22px 0 0; }
+    .chips span { font: 700 12.5px var(--body); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.88); display: inline-flex; align-items: center; gap: 8px; }
+    .chips span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--tint); }
+    .band[data-tint="green"] { --tint: #23b26a; }
+    .band[data-tint="red"] { --tint: #d8344a; }
+    .band[data-tint="gold"] { --tint: #e09a00; }
+    .band[data-tint="violet"] { --tint: #7c4dff; }
+    .band[data-tint="mint"] { --tint: #1f9d63; }
+
+    /* Mehr entdecken */
+    .jump { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .jump a { position: relative; aspect-ratio: 3 / 4.2; border-radius: 12px; overflow: hidden; text-decoration: none; background: var(--card); display: block; }
+    .jump img { width: 100%; height: 100%; object-fit: cover; object-position: top; transition: transform .5s ease; }
+    .jump a:hover img { transform: scale(1.04); }
+    .jump a::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(0,0,0,.92)); }
+    .jump .cap { position: absolute; left: 18px; right: 18px; bottom: 18px; z-index: 1; display: flex; flex-direction: column; gap: 6px; }
+    .jump .cap b { font: 800 20px/1.15 var(--display); letter-spacing: -.02em; }
+    .jump .cap small { color: var(--soft); font-size: 14px; }
 
     /* Zahlen */
-    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: -20px; }
-    .stat { padding: 22px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); }
-    .stat b { display: block; font-size: 32px; letter-spacing: -.03em; font-weight: 850; }
-    .stat span { color: var(--muted); font-size: 14px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .stat { padding: 34px 24px 30px 0; display: flex; flex-direction: column; gap: 6px; }
+    .stat + .stat { padding-left: 24px; border-left: 1px solid var(--line); }
+    .stat b { font: 900 clamp(34px, 4vw, 48px)/1 var(--display); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+    .stat span { color: var(--muted); font-size: 15px; }
 
-    /* Abschnitte */
-    section { padding: 96px 0; position: relative; }
-    .head { text-align: center; max-width: 680px; margin: 0 auto 54px; }
-    .eyebrow { color: var(--gold); font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: .14em; }
-    .head h2 { font-size: clamp(32px, 4.6vw, 52px); margin: 12px 0 14px; font-weight: 880; }
-    .head p { color: var(--muted); font-size: 18px; margin: 0; }
-
-    /* So funktioniert's */
-    .flow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; }
-    .flow-step {
-      position: relative; padding: 30px 26px; border-radius: var(--radius);
-      background: linear-gradient(180deg, var(--surface-2), var(--surface)); border: 1px solid var(--line); overflow: hidden;
-    }
-    .flow-step::after {
-      counter-increment: s; content: counter(s); position: absolute; right: 18px; top: 4px;
-      font-size: 110px; font-weight: 900; color: rgba(255,255,255,.035); line-height: 1;
-    }
-    .flow-step .ic { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; margin-bottom: 20px; font-size: 26px; }
-    .flow-step h3 { font-size: 21px; margin-bottom: 8px; }
-    .flow-step p { color: var(--muted); margin: 0; }
-
-    /* Funktions-Zeilen */
-    .feature { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; margin-bottom: 110px; }
-    .feature:last-child { margin-bottom: 0; }
-    .feature.flip .shot { order: 2; }
-    .shot { position: relative; display: grid; place-items: center; padding: 30px 0; }
-    .shot .bgcard { position: absolute; inset: 6% 8%; border-radius: 36px; }
-    .shot .phone { position: relative; width: min(300px, 70%); }
-    .feature .tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 800; margin-bottom: 16px; }
-    .feature h3 { font-size: clamp(28px, 3.6vw, 42px); font-weight: 880; margin-bottom: 16px; }
-    .feature p { color: var(--soft); font-size: 17px; margin: 0 0 22px; }
-    .checks { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-    .checks li { display: flex; gap: 12px; align-items: flex-start; color: var(--soft); }
-    .checks li::before {
-      content: "✓"; flex: none; width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center;
-      font-size: 13px; font-weight: 900; background: rgba(47,212,122,.14); color: var(--green); margin-top: 1px;
-    }
-    .checks b { color: var(--text); }
-    .note { margin-top: 20px; padding: 14px 16px; border-radius: 14px; font-size: 14px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); }
+    /* Download */
+    .get { display: grid; grid-template-columns: 1.1fr 1fr; gap: 50px; align-items: center; }
+    .get h2 { font-size: clamp(54px, 8vw, 112px); font-weight: 900; letter-spacing: -.045em; line-height: .92; }
+    .get h2 em { font-style: normal; color: var(--gold); }
+    .get-side { display: flex; flex-direction: column; gap: 18px; }
+    .get-side h3 { font-size: 28px; }
+    .get-side p { color: var(--soft); }
+    .qr-pair { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+    .qr-item { display: flex; align-items: center; gap: 14px; padding: 12px 18px 12px 12px; border-radius: 16px; background: var(--card); }
+    .qr-code { width: 84px; height: 84px; border-radius: 10px; background: #fff; padding: 6px; flex: none; }
+    .qr-code svg { width: 100%; height: 100%; display: block; }
+    .qr-item b { display: block; font: 800 17px var(--display); }
+    .qr-item small { color: var(--muted); font-size: 13.5px; line-height: 1.4; display: block; max-width: 150px; }
 
     /* Tutorial */
-    .tabs { display: flex; justify-content: center; gap: 6px; padding: 5px; margin: 0 auto 40px; width: fit-content; max-width: 100%; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); flex-wrap: wrap; }
-    .tabs button { font: inherit; font-weight: 750; font-size: 15px; color: var(--muted); background: none; border: 0; padding: 10px 18px; border-radius: 12px; cursor: pointer; }
-    .tabs button.on { background: var(--surface-3); color: var(--text); }
-    .steps { display: grid; gap: 16px; max-width: 920px; margin: 0 auto; }
-    .step {
-      display: grid; grid-template-columns: 56px 1fr 230px; gap: 22px; align-items: center;
-      padding: 22px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--line);
-    }
-    .step-num { width: 56px; height: 56px; border-radius: 18px; display: grid; place-items: center; background: var(--grad); color: #1d1300; font-weight: 900; font-size: 24px; }
-    .step h3 { font-size: 20px; margin-bottom: 6px; letter-spacing: -.02em; }
-    .step p { margin: 0; color: var(--soft); }
-    .step p b { color: var(--text); }
-    .step .tip { margin-top: 10px; font-size: 14px; color: var(--muted); display: flex; gap: 8px; }
-    .step .tip svg { width: 18px; height: 18px; color: var(--gold); margin-top: 2px; }
-    .screen { height: 150px; border-radius: 18px; padding: 14px; overflow: hidden; background: #f2f3f7; color: #1b1e27; font-size: 12px; position: relative; border: 6px solid #232937; }
-    .screen.dark { background: #10131a; color: var(--text); }
-    .screen .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-    .screen .title { font-weight: 800; font-size: 13px; margin-bottom: 8px; }
-    .screen .muted { color: #6b7180; }
-    .screen .pill2 { padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 12px; display: inline-block; }
-    .screen .pill2.blue { background: #1a73e8; color: #fff; }
-    .screen .pill2.ghost { color: #1a73e8; }
+    .tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 5px; border-radius: 999px; background: var(--card); margin-bottom: 34px; }
+    .tabs button { font: 700 14px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); background: none; border: 0; padding: 11px 20px; border-radius: 999px; cursor: pointer; }
+    .tabs button.on { background: #fff; color: #000; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+    .step { display: flex; flex-direction: column; gap: 14px; padding: 22px; border-radius: 14px; background: var(--card); }
+    .step .n { font: 900 15px var(--display); color: #000; background: #fff; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+    .step h3 { font-size: 21px; letter-spacing: -.02em; }
+    .step p { color: var(--soft); font-size: 15.5px; }
+    .step p b { color: #fff; }
+    .tip { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+    .screen { height: 150px; border-radius: 14px; padding: 14px; overflow: hidden; background: #f2f3f7; color: #1b1e27; font-size: 12px; position: relative; margin-top: auto; }
+    .screen.dark { background: #0a0a0b; color: #fff; border: 1px solid var(--line); }
+    .screen .r { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .screen .t { font-weight: 800; font-size: 13px; margin-bottom: 8px; }
+    .screen .m { color: #6b7180; }
+    .screen .pl { padding: 6px 12px; border-radius: 999px; font-weight: 800; font-size: 12px; display: inline-block; }
+    .screen .pl.blue { background: #1a73e8; color: #fff; }
+    .screen .pl.ghost { color: #1a73e8; }
     .toggle { width: 34px; height: 20px; border-radius: 10px; background: #1a73e8; position: relative; flex: none; }
     .toggle::after { content: ""; position: absolute; right: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; }
     .file { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
     .file .apk { width: 30px; height: 30px; border-radius: 8px; background: #3ddc84; display: grid; place-items: center; color: #073; font-weight: 900; font-size: 10px; }
-    .tap { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(255,176,0,.45); border: 2px solid var(--gold); animation: tap 1.6s ease-in-out infinite; }
+    .tap { position: absolute; width: 28px; height: 28px; border-radius: 50%; background: rgba(255,176,0,.45); border: 2px solid #ffb000; animation: tap 1.6s ease-in-out infinite; }
     @keyframes tap { 0%, 100% { transform: scale(.8); opacity: .5; } 50% { transform: scale(1.1); opacity: 1; } }
+    .share-ic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #e8f0fe; color: #1a73e8; vertical-align: -5px; }
+    .share-ic svg { width: 15px; height: 15px; }
 
     /* FAQ */
-    .faq { max-width: 780px; margin: 0 auto; display: grid; gap: 12px; }
-    details { border-radius: 18px; background: var(--surface); border: 1px solid var(--line); padding: 0 22px; transition: border-color .2s; }
-    details[open] { border-color: var(--line-2); }
-    summary { cursor: pointer; list-style: none; padding: 20px 0; font-weight: 750; font-size: 17px; display: flex; justify-content: space-between; gap: 16px; }
+    .faq { display: grid; gap: 0; border-top: 1px solid var(--line); max-width: 900px; }
+    details { border-bottom: 1px solid var(--line); }
+    summary { cursor: pointer; list-style: none; padding: 24px 0; font: 800 21px/1.25 var(--display); letter-spacing: -.02em; display: flex; justify-content: space-between; gap: 20px; }
     summary::-webkit-details-marker { display: none; }
-    summary::after { content: "+"; color: var(--gold); font-size: 24px; line-height: 1; transition: transform .2s ease; }
+    summary::after { content: "+"; font: 400 30px/0.8 var(--body); transition: transform .2s ease; }
     details[open] summary::after { transform: rotate(45deg); }
-    details p { margin: 0 0 20px; color: var(--soft); }
+    details p { color: var(--soft); padding-bottom: 24px; max-width: 720px; }
 
-    /* Abschluss */
-    .cta {
-      position: relative; overflow: hidden; text-align: center; padding: 70px 24px; border-radius: 36px;
-      background: radial-gradient(70% 120% at 50% 0%, rgba(255,170,0,.28), transparent 60%), var(--surface);
-      border: 1px solid var(--line);
-    }
-    .cta h2 { font-size: clamp(30px, 4.4vw, 48px); margin-bottom: 14px; font-weight: 880; }
-    .cta p { color: var(--muted); margin: 0 0 30px; font-size: 18px; }
-    .cta .fan { display: flex; justify-content: center; margin-bottom: 28px; }
-    .cta .fan i { width: 54px; height: 76px; border-radius: 8px; margin: 0 -6px; border: 1px solid rgba(255,255,255,.15); box-shadow: 0 10px 24px -10px rgba(0,0,0,.8); }
-    footer { padding: 46px 0 calc(46px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 96px; }
-    footer .wrap { display: flex; flex-direction: column; gap: 8px; }
+    /* Fußzeile */
+    footer { border-top: 1px solid var(--line); padding: 60px 0 calc(60px + env(safe-area-inset-bottom, 0px)); }
+    .foot-word { font: 900 clamp(64px, 14vw, 200px)/.85 var(--display); letter-spacing: -.05em; color: #fff; margin-bottom: 40px; }
+    .foot-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 24px; color: var(--muted); font-size: 13.5px; }
+    .foot-row .links { display: flex; gap: 22px; flex-wrap: wrap; }
+    .foot-row .links a { text-decoration: none; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; font-size: 12.5px; color: var(--soft); }
+    .legal { color: var(--muted); font-size: 13px; margin-top: 22px; max-width: 900px; }
 
-    /* Einblenden beim Scrollen */
-    .reveal { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
-    .reveal.in { opacity: 1; transform: none; }
-    @media (prefers-reduced-motion: reduce) {
-      .reveal { opacity: 1; transform: none; transition: none; }
-      .float, .tap { animation: none; }
-    }
+    @media (prefers-reduced-motion: reduce) { .slide, .jump img { transition: none; } .tap { animation: none; } }
 
-    @media (max-width: 980px) {
-      .hero { padding: 36px 0 40px; }
-      .hero .wrap { grid-template-columns: 1fr; text-align: center; }
-      .hero p.lead, .ios-note { margin-inline: auto; }
-      .games, .cta-row, .meta { justify-content: center; }
-      .qr, .qr-pair { display: none; }
-      .stage { justify-self: center; max-width: 470px; }
-      .stats { grid-template-columns: 1fr 1fr; margin-top: 0; }
-      .flow { grid-template-columns: 1fr; }
-      .feature, .feature.flip { grid-template-columns: 1fr; gap: 26px; margin-bottom: 80px; }
-      .feature.flip .shot { order: 0; }
+    @media (max-width: 960px) {
       .nav-links { display: none; }
-      .step { grid-template-columns: 48px 1fr; }
-      .step-num { width: 48px; height: 48px; font-size: 20px; border-radius: 15px; }
-      .step .screen { grid-column: 1 / -1; }
-      section { padding: 64px 0; }
+      nav .wrap { grid-template-columns: 1fr auto; }
+      .hero { height: auto; min-height: 0; }
+      .slide { position: absolute; }
+      .slide.on { position: relative; }
+      .slide .art { position: relative; right: auto; top: auto; width: min(92vw, 470px); height: 470px; margin: 86px auto 0; }
+      .hero-copy { position: relative; bottom: auto; padding: 4px 0 96px; }
+      .hero-ctrl { right: auto; left: var(--gutter); bottom: 34px; }
+      .news { grid-template-columns: 1fr; }
+      .band { flex-direction: column; align-items: stretch; min-height: 0; }
+      .band .art { position: relative; right: auto; top: auto; width: min(92vw, 440px); height: 420px; margin: 40px auto 0; }
+      .band-copy { padding-top: 10px; }
+      .jump { grid-template-columns: 1fr 1fr; }
+      .stats { grid-template-columns: 1fr 1fr; }
+      .stat:nth-child(3) { padding-left: 0; border-left: 0; }
+      .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+      .get { grid-template-columns: 1fr; gap: 30px; }
+      .qr-pair { display: none; }
+      .block { padding: 70px 0; }
     }
     @media (max-width: 520px) {
-      .btn.big { width: 100%; }
-      .stat b { font-size: 26px; }
-      .step { padding: 18px; gap: 14px 16px; }
-      .float { font-size: 12px; padding: 8px 10px; }
-      .float .dot { width: 22px; height: 22px; }
-      .f1 { left: -4%; }
-      .f2 { right: -4%; }
+      .btn { height: 50px; padding: 0 22px; font-size: 16px; }
+      .hero .row .btn, .get-side .row .btn { flex: 1; }
+      .news-item { grid-template-columns: 92px 1fr; }
+      .lockup img { width: 52px; height: 52px; }
+      .lockup span { font-size: 25px; }
     }
   </style>
 </head>
 <body>
-  <nav>
+  <nav id="nav">
     <div class="wrap">
-      <a class="logo" href="#"><img src="icon.svg" alt=""> CardVault</a>
+      <a class="logo" href="#top"><img src="icon.svg" alt=""> CardVault</a>
       <div class="nav-links">
-        <a href="#funktionen">Funktionen</a>
-        <a href="#echtheit">Echtheits-Check</a>
+        <a href="#news">Neu</a>
+        <a href="#kamera">Kamera</a>
+        <a href="#echtheit">Echtheit</a>
         <a href="#tutorial">Tutorial</a>
         <a href="#faq">Fragen</a>
       </div>
-      <a class="btn primary small" href="CardVault.apk" download>
-        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-        Download
-      </a>
+      <a class="btn outline small nav-cta" href="#download">Download</a>
     </div>
   </nav>
 
-  <header class="hero">
-    <div class="glow" style="width:520px;height:520px;background:#ff9d00;right:-120px;top:-160px;opacity:.28"></div>
-    <div class="glow" style="width:420px;height:420px;background:#4c8dff;left:-180px;bottom:-120px;opacity:.22"></div>
-    <div class="wrap">
-      <div>
-        <div class="pill"><b>NEU</b> Jetzt auch fürs iPhone · Yu-Gi-Oh! · Echtheits-Check</div>
-        <h1>Scanne deine Karten.<br><span class="grad-text">Kenne ihren Wert.</span></h1>
-        <p class="lead">Halte die Karte vor die Kamera und CardVault erkennt sie in Sekunden. Du siehst den aktuellen Marktpreis, kannst prüfen, ob sie echt ist, und baust deine Sammlung mit Gesamtwert auf.</p>
-        <div class="games">
-          <span class="game"><i style="background:#ffcb05"></i>Pokémon</span>
-          <span class="game"><i style="background:#9b6bff"></i>Yu-Gi-Oh!</span>
-          <span class="game"><i style="background:#2fd47a"></i>Fußball</span>
-          <span class="game"><i style="background:#ff5470"></i>American Football</span>
-        </div>
-        <div class="cta-row" id="get-row">
-          <a class="btn primary big" id="get-android" href="CardVault.apk" download>
-            <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-            <span class="two">Android: APK laden<span class="sub">Version 1.1.1 · kostenlos</span></span>
-          </a>
-          <a class="btn ghost big" id="get-iphone" href="app/">
-            <svg class="i" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
-            <span class="two">iPhone: App öffnen<span class="sub">Web-App für Safari · kostenlos</span></span>
-          </a>
-        </div>
-        <div class="qr-pair" id="qr" hidden>
-          <div class="qr-item">
-            <div class="qr-code" id="qr-android"></div>
-            <div><b>Android</b><small>Mit dem Handy scannen und die APK laden</small></div>
-          </div>
-          <div class="qr-item">
-            <div class="qr-code" id="qr-iphone"></div>
-            <div><b>iPhone</b><small>Mit der Kamera scannen und in Safari öffnen</small></div>
-          </div>
-        </div>
-        <div class="meta">
-          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Android &amp; iPhone</span>
-          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Keine Anmeldung</span>
-          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Keine Werbung</span>
-          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Erkennung direkt auf dem Handy</span>
-        </div>
+  <header class="hero" id="top">
+    <div class="slide on" data-tint="gold">
+      <div class="art" aria-hidden="true">
+        <div class="phone p2"><img src="screens/detail.jpg" alt=""></div>
+        <div class="phone p1"><img src="screens/scanner.jpg" alt=""></div>
       </div>
-
-      <div class="stage" aria-hidden="true">
+      <div class="hero-copy"><div class="wrap"><div class="inner">
+        <div class="lockup"><img src="icon.svg" alt=""><span>CardVault</span></div>
+        <div class="eyebrow">Neu in Version 1.2</div>
+        <h1>Karte hinhalten. Den Rest macht die Kamera.</h1>
+        <p class="lead">Die Live-Kamera erkennt deine Karte, rahmt sie grün ein und scannt von selbst, sobald alles scharf ist.</p>
+        <div class="row">
+          <a class="btn white" data-get="android" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Für Android</a>
+          <a class="btn outline" data-get="iphone" href="app/">Fürs iPhone</a>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="slide" data-tint="red">
+      <div class="art" aria-hidden="true">
+        <div class="phone p2"><img src="screens/detail.jpg" alt=""></div>
+        <div class="phone p1"><img src="screens/fakecheck.jpg" alt=""></div>
+      </div>
+      <div class="hero-copy"><div class="wrap"><div class="inner">
+        <div class="lockup"><img src="icon.svg" alt=""><span>CardVault</span></div>
+        <div class="eyebrow">Echtheits-Check</div>
+        <h1>Echt oder Fake? Die App schaut genau hin.</h1>
+        <p class="lead">Nummer, Name, KP, Attacken, Bild und Farben – verglichen mit der echten Karte.</p>
+        <div class="row">
+          <a class="btn white" data-get="android" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Für Android</a>
+          <a class="btn outline" href="#echtheit">Mehr erfahren</a>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="slide" data-tint="violet">
+      <div class="art" aria-hidden="true">
         <div class="phone p2"><img src="screens/yugioh.jpg" alt=""></div>
-        <div class="phone p3"><img src="screens/fakecheck.jpg" alt=""></div>
         <div class="phone p1"><img src="screens/collection.jpg" alt=""></div>
-        <div class="float f1"><span class="dot" style="background:rgba(47,212,122,.15);color:var(--green)">✓</span><div>025/165 erkannt<small>Pikachu · 151</small></div></div>
-        <div class="float f2"><span class="dot" style="background:rgba(255,203,5,.15);color:var(--gold)">€</span><div>Live-Preis<small>von Cardmarket</small></div></div>
-        <div class="float f3"><span class="dot" style="background:rgba(255,84,112,.15);color:var(--red)">🛡</span><div>Echtheits-Check<small>KP passt nicht!</small></div></div>
+      </div>
+      <div class="hero-copy"><div class="wrap"><div class="inner">
+        <div class="lockup"><img src="icon.svg" alt=""><span>CardVault</span></div>
+        <div class="eyebrow">Deine Sammlung</div>
+        <h1>Pokémon. Yu-Gi-Oh!. Fußball. Football.</h1>
+        <p class="lead">Alle Karten an einem Ort – mit Gesamtwert, Preisentwicklung und deiner wertvollsten Karte ganz groß.</p>
+        <div class="row">
+          <a class="btn white" data-get="android" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Für Android</a>
+          <a class="btn outline" data-get="iphone" href="app/">Fürs iPhone</a>
+        </div>
+      </div></div></div>
+    </div>
+    <div class="hero-ctrl">
+      <button class="pause" id="pause" aria-label="Bildwechsel anhalten"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></button>
+      <div class="bars" id="bars">
+        <button class="bar on" aria-label="Bild 1"><i></i></button>
+        <button class="bar" aria-label="Bild 2"><i></i></button>
+        <button class="bar" aria-label="Bild 3"><i></i></button>
       </div>
     </div>
   </header>
 
-  <div class="wrap">
-    <div class="stats reveal">
-      <div class="stat"><b class="grad-text">21.000+</b><span>Pokémon-Karten mit Preis</span></div>
-      <div class="stat"><b>14.600+</b><span>Yu-Gi-Oh!-Karten</span></div>
-      <div class="stat"><b>Täglich</b><span>neue Marktpreise</span></div>
-      <div class="stat"><b>0 €</b><span>ohne Abo, ohne Konto</span></div>
-    </div>
-  </div>
-
-  <section id="funktionen">
+  <section class="block" id="news">
     <div class="wrap">
-      <div class="head reveal">
-        <div class="eyebrow">So funktioniert's</div>
-        <h2>Scannen. Prüfen. Sammeln.</h2>
-        <p>Drei Schritte von der Karte in deiner Hand zum Wert deiner ganzen Sammlung.</p>
+      <div class="block-head"><h2>Neuigkeiten</h2><span class="eyebrow">Was sich zuletzt geändert hat</span></div>
+      <div class="news">
+        <a class="news-big" href="#kamera">
+          <div class="pic"><img src="screens/scanner.jpg" alt=""><img src="screens/detail.jpg" alt=""></div>
+          <div class="txt">
+            <div class="eyebrow">CardVault 1.2</div>
+            <h3>Live-Kamera mit Auto-Scan: Karte hinhalten, fertig</h3>
+            <div class="date">25. Oktober 2026</div>
+          </div>
+        </a>
+        <div class="news-list">
+          <a class="news-item" href="#tutorial">
+            <div class="thumb"><img src="screens/collection.jpg" alt=""></div>
+            <div class="meta"><div class="eyebrow">iPhone</div><h3>CardVault gibt es jetzt auch fürs iPhone</h3><div class="date">24. Oktober 2026</div></div>
+          </a>
+          <a class="news-item" href="#echtheit">
+            <div class="thumb"><img src="screens/fakecheck.jpg" alt=""></div>
+            <div class="meta"><div class="eyebrow">Echtheits-Check</div><h3>Fälschungen an falschen KP und Farben erkennen</h3><div class="date">24. Oktober 2026</div></div>
+          </a>
+          <a class="news-item" href="#sammeln">
+            <div class="thumb"><img src="screens/yugioh.jpg" alt=""></div>
+            <div class="meta"><div class="eyebrow">Neue Kategorien</div><h3>Yu-Gi-Oh!, Fußball und Football in deiner Sammlung</h3><div class="date">24. Oktober 2026</div></div>
+          </a>
+        </div>
       </div>
-      <div class="flow">
-        <div class="flow-step reveal">
-          <div class="ic" style="background:rgba(255,203,5,.12)">📷</div>
-          <h3>Karte scannen</h3>
-          <p>Kartenart wählen, Karte in den Rahmen halten, Auslöser drücken. Die App liest Name, Nummer oder Set-Code und vergleicht das Bild mit tausenden Originalen.</p>
-        </div>
-        <div class="flow-step reveal">
-          <div class="ic" style="background:rgba(255,84,112,.12)">🛡️</div>
-          <h3>Preis &amp; Echtheit prüfen</h3>
-          <p>Du siehst sofort den Marktpreis für die richtige Version. Mit einem Tipp prüfst du, ob die Karte typische Merkmale einer Fälschung hat.</p>
-        </div>
-        <div class="flow-step reveal">
-          <div class="ic" style="background:rgba(76,141,255,.12)">📈</div>
-          <h3>Sammlung aufbauen</h3>
-          <p>Alle Karten landen in deiner Sammlung, sortiert nach Pokémon, Yu-Gi-Oh!, Fußball und Football, mit Gesamtwert und Preisentwicklung.</p>
-        </div>
+    </div>
+  </section>
+
+  <section class="band" data-tint="green" id="kamera">
+    <div class="art" aria-hidden="true">
+      <div class="phone"><img src="screens/scanner.jpg" alt=""></div>
+    </div>
+    <div class="wrap">
+      <div class="band-copy">
+        <div class="crumb">Funktionen / <b>Live-Kamera</b></div>
+        <h2>Sieht die Karte, bevor du abdrückst.</h2>
+        <p>Die Kamera sucht die Karte live im Bild, rahmt sie ein und richtet sie gerade aus – auch schräg, quer oder auf dem Kopf. Ist sie ruhig und scharf, löst Auto-Scan von selbst aus.</p>
+        <div class="row"><a class="btn white" data-get="android" href="CardVault.apk" download>Jetzt laden</a><a class="btn outline" href="#tutorial">So geht's</a></div>
+        <div class="chips"><span>Live-Rahmen</span><span>Auto-Scan</span><span>Unschärfe-Warnung</span><span>Zoom</span><span>Fokus per Tippen</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" data-tint="red" id="echtheit">
+    <div class="art" aria-hidden="true">
+      <div class="phone"><img src="screens/fakecheck.jpg" alt=""></div>
+    </div>
+    <div class="wrap">
+      <div class="band-copy">
+        <div class="crumb">Funktionen / <b>Echtheits-Check</b></div>
+        <h2>Echt oder Fake?</h2>
+        <p>Fälschungen haben oft falsche KP, erfundene Attacken oder übertrieben knallige Farben. CardVault vergleicht deinen Scan Punkt für Punkt mit der echten Karte – bei Yu-Gi-Oh! auch Set-Code und Passcode.</p>
+        <p style="font-size:15px;color:var(--muted)">Ein Handyfoto kann Echtheit nie beweisen. Der Check findet aber die typischen Fehler von Fälschungen.</p>
+        <div class="chips"><span>Kartennummer</span><span>KP</span><span>Attacken</span><span>Bildvergleich</span><span>Farben</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" data-tint="gold" id="sammeln">
+    <div class="art" aria-hidden="true">
+      <div class="phone"><img src="screens/collection.jpg" alt=""></div>
+      <div class="phone"><img src="screens/yugioh.jpg" alt=""></div>
+    </div>
+    <div class="wrap">
+      <div class="band-copy">
+        <div class="crumb">Funktionen / <b>Sammlung</b></div>
+        <h2>Deine wertvollste Karte. Ganz groß.</h2>
+        <p>Alle Karten mit Gesamtwert und Preisentwicklung. Pokémon mit Cardmarket-Preisen, Yu-Gi-Oh! mit dem Preis für deinen Druck, Fußball und Football mit deinem eigenen Wert.</p>
+        <div class="chips"><span>21.000+ Pokémon</span><span>14.600+ Yu-Gi-Oh!</span><span>Fußball</span><span>American Football</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="wrap">
+      <div class="block-head"><h2>Mehr entdecken</h2></div>
+      <div class="jump">
+        <a href="#kamera"><img src="screens/scanner.jpg" alt=""><div class="cap"><b>Live-Kamera</b><small>Erkennt die Karte von selbst</small></div></a>
+        <a href="#echtheit"><img src="screens/fakecheck.jpg" alt=""><div class="cap"><b>Echtheits-Check</b><small>Falsche KP? Sofort sichtbar</small></div></a>
+        <a href="#sammeln"><img src="screens/yugioh.jpg" alt=""><div class="cap"><b>Yu-Gi-Oh!</b><small>Preis für deinen Druck</small></div></a>
+        <a href="#sammeln"><img src="screens/sport.jpg" alt=""><div class="cap"><b>Sportkarten</b><small>Mit Foto und eigenem Wert</small></div></a>
       </div>
     </div>
   </section>
 
   <section>
     <div class="wrap">
-      <div class="feature">
-        <div class="shot reveal">
-          <div class="bgcard" style="background:radial-gradient(70% 70% at 50% 40%, rgba(255,176,0,.25), transparent 70%)"></div>
-          <div class="phone"><img src="screens/collection.jpg" alt="Sammlung in CardVault mit Gesamtwert und Kategorien"></div>
-        </div>
-        <div class="reveal">
-          <span class="tag" style="background:rgba(255,203,5,.1);color:var(--gold)">Erkennung</span>
-          <h3>Erkennt die richtige Karte, auch wenn's knifflig wird</h3>
-          <p>Von Pikachu gibt es über hundert Karten. CardVault liest die Kartennummer und vergleicht zusätzlich dein Foto mit den Originalbildern. So findet die App auch Full-Art-Karten, bei denen man die Nummer kaum lesen kann.</p>
-          <ul class="checks">
-            <li><span><b>Nummer + Name + Bild</b> werden gemeinsam ausgewertet</span></li>
-            <li><span><b>Unsicher?</b> Dann zeigt dir die App die besten Treffer zur Auswahl, statt einfach zu raten</span></li>
-            <li><span><b>Deutsche und englische Karten</b>, vom Base Set bis zu den neuesten Erweiterungen</span></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature flip" id="echtheit">
-        <div class="shot reveal">
-          <div class="bgcard" style="background:radial-gradient(70% 70% at 50% 40%, rgba(255,84,112,.22), transparent 70%)"></div>
-          <div class="phone"><img src="screens/fakecheck.jpg" alt="Echtheits-Check erkennt falsche KP"></div>
-        </div>
-        <div class="reveal">
-          <span class="tag" style="background:rgba(255,84,112,.12);color:var(--red)">Echtheits-Check</span>
-          <h3>Echt oder Fake? Die App schaut genau hin.</h3>
-          <p>Fälschungen haben oft falsche KP, erfundene Attacken, Schreibfehler oder übertrieben knallige Farben. CardVault vergleicht deinen Scan Punkt für Punkt mit den Daten der echten Karte.</p>
-          <ul class="checks">
-            <li><span><b>Pokémon:</b> Kartennummer, Name, KP, Attacken, Bild und Farben</span></li>
-            <li><span><b>Yu-Gi-Oh!:</b> Set-Code und 8-stelliger Passcode</span></li>
-            <li><span><b>Profi-Tipps</b> für den Lichttest, die Rückseite und die Schrift</span></li>
-          </ul>
-          <div class="note">Ehrlich gesagt: Ein Handyfoto kann nie beweisen, dass eine Karte echt ist. Der Check findet aber die typischen Fehler von Fälschungen. Wertvolle Karten lässt du am besten zusätzlich von Profis prüfen.</div>
-        </div>
-      </div>
-
-      <div class="feature">
-        <div class="shot reveal">
-          <div class="bgcard" style="background:radial-gradient(70% 70% at 50% 40%, rgba(155,107,255,.25), transparent 70%)"></div>
-          <div class="phone"><img src="screens/yugioh.jpg" alt="Yu-Gi-Oh!-Karte mit Marktpreis"></div>
-        </div>
-        <div class="reveal">
-          <span class="tag" style="background:rgba(155,107,255,.14);color:#c4a8ff">Yu-Gi-Oh!</span>
-          <h3>Yu-Gi-Oh! mit Set-Code-Erkennung</h3>
-          <p>Jeder Druck einer Yu-Gi-Oh!-Karte hat einen eigenen Wert. CardVault liest den Set-Code unter dem Bild (z. B. LOB-DE001) und zeigt dir den Preis genau für deine Ausgabe und Seltenheit.</p>
-          <ul class="checks">
-            <li><span><b>Über 14.600 Karten</b> mit deutschen Namen</span></li>
-            <li><span><b>Marktpreis je Druck</b>, automatisch in Euro umgerechnet</span></li>
-            <li><span><b>Alte deutsche Codes</b> wie „LOB-G001“ werden auch erkannt</span></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="feature flip">
-        <div class="shot reveal">
-          <div class="bgcard" style="background:radial-gradient(70% 70% at 50% 40%, rgba(47,212,122,.2), transparent 70%)"></div>
-          <div class="phone"><img src="screens/sport.jpg" alt="Sportkarte mit eigenem Wert anlegen"></div>
-        </div>
-        <div class="reveal">
-          <span class="tag" style="background:rgba(47,212,122,.12);color:var(--green)">Fußball &amp; Football</span>
-          <h3>Auch deine Sportkarten haben ihren Platz</h3>
-          <p>Match Attax, Panini, Topps: Fotografiere deine Fußball- und Football-Karten. Die App liest den Spielernamen ab, und du trägst Mannschaft, Serie und Wert ein.</p>
-          <ul class="checks">
-            <li><span><b>Foto + Name</b> werden beim Scannen übernommen</span></li>
-            <li><span><b>Eigene Kategorie</b> mit eigenem Gesamtwert</span></li>
-            <li><span><b>Preis-Tipp:</b> So findest du bei eBay echte Verkaufspreise</span></li>
-          </ul>
-          <div class="note">Für Sportkarten gibt es leider keine freie Preisdatenbank. Deshalb trägst du den Wert hier selbst ein.</div>
-        </div>
+      <div class="stats">
+        <div class="stat"><b>21.000+</b><span>Pokémon-Karten mit Preis</span></div>
+        <div class="stat"><b>14.600+</b><span>Yu-Gi-Oh!-Karten</span></div>
+        <div class="stat"><b>Täglich</b><span>neue Marktpreise</span></div>
+        <div class="stat"><b>0 €</b><span>ohne Abo, ohne Konto, ohne Werbung</span></div>
       </div>
     </div>
   </section>
 
-  <section id="tutorial">
-    <div class="wrap">
-      <div class="head reveal">
-        <div class="eyebrow">Tutorial</div>
-        <h2>In 2 Minuten startklar</h2>
-        <p>So installierst du CardVault und scannst deine erste Karte.</p>
+  <section class="block" id="download">
+    <div class="wrap get">
+      <h2>Hol dir <em>Card­Vault.</em></h2>
+      <div class="get-side">
+        <h3>Kostenlos für Android und iPhone</h3>
+        <p>Android: APK laden und installieren. iPhone: in Safari öffnen und zum Home-Bildschirm hinzufügen. Keine Anmeldung, keine Werbung.</p>
+        <div class="row" id="get-row">
+          <a class="btn white" id="get-android" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Android · APK</a>
+          <a class="btn outline" id="get-iphone" href="app/">iPhone · Web-App</a>
+        </div>
+        <div class="qr-pair" id="qr" hidden>
+          <div class="qr-item"><div class="qr-code" id="qr-android"></div><div><b>Android</b><small>Mit dem Handy scannen und die APK laden</small></div></div>
+          <div class="qr-item"><div class="qr-code" id="qr-iphone"></div><div><b>iPhone</b><small>Mit der Kamera scannen und in Safari öffnen</small></div></div>
+        </div>
+        <p class="date">Version 1.2.0 · ab Android 7 · iPhone mit aktuellem Safari</p>
       </div>
+    </div>
+  </section>
 
+  <section class="block" id="tutorial" style="padding-top:20px">
+    <div class="wrap">
+      <div class="block-head"><h2>Tutorial</h2><span class="eyebrow">In 2 Minuten startklar</span></div>
       <div class="tabs" role="tablist">
-        <button class="on" data-tab="install" role="tab">Android installieren</button>
-        <button data-tab="iphone" role="tab">iPhone einrichten</button>
+        <button class="on" data-tab="install" role="tab">Android</button>
+        <button data-tab="iphone" role="tab">iPhone</button>
         <button data-tab="use" role="tab">Benutzen</button>
       </div>
 
       <div class="steps" data-panel="install">
-        <div class="step reveal">
-          <div class="step-num">1</div>
-          <div>
-            <h3>APK herunterladen</h3>
-            <p>Öffne diese Seite <b>auf deinem Android-Handy</b> und tippe auf <b>„APK herunterladen“</b>. Wenn Chrome fragt, ob du die Datei behalten willst, tippe auf <b>„Trotzdem herunterladen“</b>.</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Chrome warnt bei jeder APK-Datei, die nicht aus dem Play Store kommt. Das ist normal.</div>
-          </div>
-          <div class="screen">
-            <div class="title">Datei herunterladen?</div>
-            <div class="muted" style="margin-bottom:14px">Dateien dieses Typs können schädlich sein. CardVault.apk trotzdem herunterladen?</div>
-            <div class="row" style="justify-content:flex-end;gap:10px"><span class="pill2 ghost">Abbrechen</span><span class="pill2 blue">Trotzdem herunterladen</span></div>
-            <span class="tap" style="right:44px;bottom:12px"></span>
-          </div>
+        <div class="step"><div class="n">1</div><h3>APK herunterladen</h3>
+          <p>Öffne diese Seite <b>auf deinem Android-Handy</b> und tippe auf <b>„Für Android“</b>. Fragt Chrome nach, tippe auf <b>„Trotzdem herunterladen“</b>.</p>
+          <div class="tip">Chrome warnt bei jeder APK, die nicht aus dem Play Store kommt. Das ist normal.</div>
+          <div class="screen"><div class="t">Datei herunterladen?</div><div class="m" style="margin-bottom:14px">CardVault.apk trotzdem herunterladen?</div><div class="r" style="justify-content:flex-end;gap:10px"><span class="pl ghost">Abbrechen</span><span class="pl blue">Trotzdem herunterladen</span></div><span class="tap" style="right:44px;bottom:12px"></span></div>
         </div>
-        <div class="step reveal">
-          <div class="step-num">2</div>
-          <div>
-            <h3>Datei öffnen</h3>
-            <p>Tippe auf <b>„Öffnen“</b> in der Download-Meldung. Verpasst? Dann öffne die App <b>„Dateien“</b>, geh zu <b>„Downloads“</b> und tippe auf <b>CardVault.apk</b>.</p>
-          </div>
-          <div class="screen">
-            <div class="title">Downloads</div>
-            <div class="file"><div class="apk">APK</div><div style="flex:1"><b>CardVault.apk</b><div class="muted">Gerade eben</div></div></div>
-            <span class="tap" style="left:40%;top:52px"></span>
-          </div>
+        <div class="step"><div class="n">2</div><h3>Datei öffnen</h3>
+          <p>Tippe in der Download-Meldung auf <b>„Öffnen“</b> – oder in der App <b>„Dateien“</b> unter <b>„Downloads“</b> auf <b>CardVault.apk</b>.</p>
+          <div class="screen"><div class="t">Downloads</div><div class="file"><div class="apk">APK</div><div style="flex:1"><b>CardVault.apk</b><div class="m">Gerade eben</div></div></div><span class="tap" style="left:40%;top:52px"></span></div>
         </div>
-        <div class="step reveal">
-          <div class="step-num">3</div>
-          <div>
-            <h3>Installation erlauben</h3>
-            <p>Beim ersten Mal fragt Android, ob Chrome (oder „Dateien“) Apps installieren darf. Tippe auf <b>„Einstellungen“</b> und schalte <b>„Dieser Quelle vertrauen“</b> ein. Danach gehst du mit der Zurück-Taste zurück.</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Der Name kann je nach Handy anders sein, z. B. „Aus dieser Quelle zulassen“ oder „Unbekannte Apps installieren“.</div>
-          </div>
-          <div class="screen">
-            <div class="title">Unbekannte Apps installieren</div>
-            <div class="row" style="margin-bottom:12px"><b>Chrome</b></div>
-            <div class="row"><span>Dieser Quelle vertrauen</span><span class="toggle"></span></div>
-            <span class="tap" style="right:14px;top:68px"></span>
-          </div>
+        <div class="step"><div class="n">3</div><h3>Installation erlauben</h3>
+          <p>Beim ersten Mal: <b>„Einstellungen“</b> antippen und <b>„Dieser Quelle vertrauen“</b> einschalten, dann zurück.</p>
+          <div class="screen"><div class="t">Unbekannte Apps installieren</div><div class="r" style="margin-bottom:12px"><b>Chrome</b></div><div class="r"><span>Dieser Quelle vertrauen</span><span class="toggle"></span></div><span class="tap" style="right:14px;top:68px"></span></div>
         </div>
-        <div class="step reveal">
-          <div class="step-num">4</div>
-          <div>
-            <h3>Installieren</h3>
-            <p>Tippe auf <b>„Installieren“</b>. Falls <b>Google Play Protect</b> eine Meldung zeigt, tippe auf <b>„Weitere Details“</b> und dann auf <b>„Trotzdem installieren“</b>.</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Play Protect kennt CardVault nicht, weil die App nicht im Play Store ist. Sie braucht nur Zugriff auf die Kamera und das Internet.</div>
-          </div>
-          <div class="screen">
-            <div class="row" style="gap:10px;margin-bottom:10px;flex-wrap:nowrap">
-              <img src="icon.svg" alt="" style="width:36px;height:36px">
-              <div style="flex:1"><b>CardVault</b><div class="muted">Möchtest du diese App installieren?</div></div>
-            </div>
-            <div class="row" style="justify-content:flex-end;gap:14px;margin-top:22px"><span class="pill2 ghost">Abbrechen</span><span class="pill2 blue">Installieren</span></div>
-            <span class="tap" style="right:26px;bottom:12px"></span>
-          </div>
-        </div>
-        <div class="step reveal">
-          <div class="step-num">5</div>
-          <div>
-            <h3>Öffnen und Kamera erlauben</h3>
-            <p>Starte CardVault. Beim ersten Scan fragt die App nach der Kamera. Tippe auf <b>„Bei Nutzung der App zulassen“</b>. Fertig! 🎉</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Update von Version 1.0? Einfach die neue APK drüber installieren. Deine Sammlung bleibt erhalten.</div>
-          </div>
-          <div class="screen">
-            <div class="title" style="text-align:center">CardVault erlauben, Bilder und Videos aufzunehmen?</div>
-            <div style="display:grid;gap:6px;margin-top:10px">
-              <span class="pill2 blue" style="text-align:center">Bei Nutzung der App zulassen</span>
-              <span class="pill2 ghost" style="text-align:center">Nicht zulassen</span>
-            </div>
-            <span class="tap" style="left:46%;top:62px"></span>
-          </div>
+        <div class="step"><div class="n">4</div><h3>Installieren</h3>
+          <p>Auf <b>„Installieren“</b> tippen. Zeigt <b>Play Protect</b> eine Meldung: <b>„Weitere Details“</b> → <b>„Trotzdem installieren“</b>.</p>
+          <div class="tip">Update von einer älteren Version? Einfach drüber installieren – die Sammlung bleibt.</div>
+          <div class="screen"><div class="r" style="gap:10px;margin-bottom:10px;flex-wrap:nowrap"><img src="icon.svg" alt="" style="width:36px;height:36px"><div style="flex:1"><b>CardVault</b><div class="m">Diese App installieren?</div></div></div><div class="r" style="justify-content:flex-end;gap:14px;margin-top:22px"><span class="pl ghost">Abbrechen</span><span class="pl blue">Installieren</span></div><span class="tap" style="right:26px;bottom:12px"></span></div>
         </div>
       </div>
 
       <div class="steps" data-panel="iphone" hidden>
-        <div class="step">
-          <div class="step-num">1</div>
-          <div>
-            <h3>In Safari öffnen</h3>
-            <p>Öffne diese Seite auf deinem iPhone in <b>Safari</b> und tippe auf <b>„iPhone: App öffnen“</b>. Am PC kannst du auch den iPhone-QR-Code oben mit der Kamera-App scannen.</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Auf dem iPhone gibt es keine APK. CardVault läuft dort als Web-App, mit Kamera, Erkennung und Sammlung.</div>
-          </div>
-          <div class="screen">
-            <div class="title">lucabiotti129-ui.github.io</div>
-            <div style="padding:10px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:8px;align-items:center"><img src="icon.svg" alt="" style="width:28px;height:28px"><b>iPhone: App öffnen</b></div>
-            <span class="tap" style="left:45%;top:60px"></span>
-          </div>
+        <div class="step"><div class="n">1</div><h3>In Safari öffnen</h3>
+          <p>Öffne diese Seite auf dem iPhone in <b>Safari</b> und tippe auf <b>„Fürs iPhone“</b>. Am PC kannst du den iPhone-QR-Code mit der Kamera scannen.</p>
+          <div class="tip">Auf dem iPhone gibt es keine APK – CardVault läuft dort als Web-App, mit Kamera, Erkennung und Sammlung.</div>
         </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div>
-            <h3>Auf „Teilen“ tippen</h3>
-            <p>Tippe in Safari unten in der Leiste auf das <b>Teilen-Symbol</b> <span class="share-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span> (ein Quadrat mit Pfeil nach oben).</p>
-          </div>
-          <div class="screen" style="display:flex;align-items:flex-end;justify-content:center">
-            <div style="display:flex;gap:26px;padding:10px 18px;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);color:#1a73e8;font-size:18px">‹ › <span class="share-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span> ⧉</div>
-            <span class="tap" style="left:49%;bottom:16px"></span>
-          </div>
+        <div class="step"><div class="n">2</div><h3>Auf „Teilen“ tippen</h3>
+          <p>Tippe unten in Safari auf das <b>Teilen-Symbol</b> <span class="share-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span> (Quadrat mit Pfeil).</p>
         </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div>
-            <h3>„Zum Home-Bildschirm“ wählen</h3>
-            <p>Scrolle in der Liste etwas nach unten und tippe auf <b>„Zum Home-Bildschirm“</b>. Danach oben rechts auf <b>„Hinzufügen“</b>.</p>
-          </div>
-          <div class="screen">
-            <div class="row" style="padding:8px 10px;border-radius:10px;background:#fff;margin-bottom:6px"><span>Zur Leseliste</span><span class="muted">○○</span></div>
-            <div class="row" style="padding:8px 10px;border-radius:10px;background:#fff;font-weight:800"><span>Zum Home-Bildschirm</span><span>⊞</span></div>
-            <span class="tap" style="left:40%;top:56px"></span>
-          </div>
+        <div class="step"><div class="n">3</div><h3>„Zum Home-Bildschirm“</h3>
+          <p>In der Liste <b>„Zum Home-Bildschirm“</b> wählen und oben rechts <b>„Hinzufügen“</b> tippen.</p>
         </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div>
-            <h3>App starten und Kamera erlauben</h3>
-            <p>Jetzt ist <b>CardVault</b> auf deinem Home-Bildschirm. Öffne die App von dort und tippe beim ersten Scan auf <b>„Erlauben“</b> für die Kamera. Fertig! 🎉</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Öffne CardVault immer über das Symbol auf dem Home-Bildschirm. Dort bleibt deine Sammlung dauerhaft gespeichert, und Updates kommen automatisch.</div>
-          </div>
-          <div class="screen dark" style="display:grid;place-items:center">
-            <div style="text-align:center"><img src="icon.svg" alt="" style="width:54px;height:54px;border-radius:14px;margin:0 auto 6px"><b style="font-size:12px">CardVault</b></div>
-            <span class="tap" style="left:45%;top:38px"></span>
-          </div>
+        <div class="step"><div class="n">4</div><h3>Starten und Kamera erlauben</h3>
+          <p>CardVault vom Home-Bildschirm öffnen und beim ersten Scan <b>„Erlauben“</b> tippen. Fertig!</p>
+          <div class="tip">Immer über das Symbol öffnen – dort bleibt die Sammlung dauerhaft gespeichert.</div>
         </div>
       </div>
 
       <div class="steps" data-panel="use" hidden>
-        <div class="step">
-          <div class="step-num">1</div>
-          <div>
-            <h3>Kartenart wählen und scannen</h3>
-            <p>Tippe unten auf den <b>gelben Scan-Knopf</b> und wähle oben <b>Pokémon</b>, <b>Yu-Gi-Oh!</b> oder <b>Sport</b>. Leg die Karte auf einen ruhigen Untergrund, halte das Handy gerade darüber und tippe auf den Auslöser.</p>
-            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Wichtig ist die <b>Nummer unten</b> (Pokémon, z. B. 025/165) bzw. der <b>Set-Code unter dem Bild</b> (Yu-Gi-Oh!, z. B. LOB-DE001). Gutes Licht und keine Spiegelungen helfen.</div>
-          </div>
-          <div class="screen dark" style="display:grid;place-items:center">
-            <div style="display:flex;gap:4px;margin-bottom:8px;font-size:10px;font-weight:800"><span style="background:var(--grad);color:#1d1300;padding:3px 8px;border-radius:99px">Pokémon</span><span style="padding:3px 8px;color:var(--muted)">Yu-Gi-Oh!</span><span style="padding:3px 8px;color:var(--muted)">Sport</span></div>
-            <div style="width:62px;height:86px;border:3px solid var(--gold);border-radius:9px;display:grid;place-items:center">
-              <div style="width:52px;height:74px;border-radius:5px;background:var(--grad);position:relative"><span style="position:absolute;left:3px;bottom:3px;font-size:7px;font-weight:900;color:#1d1300;outline:1.5px solid var(--red);border-radius:2px;padding:0 2px">025/165</span></div>
-            </div>
-          </div>
+        <div class="step"><div class="n">1</div><h3>Karte hinlegen</h3>
+          <p>Leg die Karte auf einen <b>dunklen Untergrund</b> und tippe unten auf <b>„Scan“</b>. Wähle oben Pokémon, Yu-Gi-Oh! oder Sport.</p>
         </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div>
-            <h3>Richtige Karte bestätigen</h3>
-            <p>Ist sich die App sicher, siehst du direkt die Karte mit Preis. Wenn nicht, zeigt sie dir <b>„Welche Karte ist es?“</b> mit den besten Treffern. Tippe einfach auf deine Karte.</p>
-          </div>
-          <div class="screen dark">
-            <div style="font-weight:800;margin-bottom:8px">Welche Karte ist es?</div>
-            <div class="row" style="justify-content:flex-start;gap:6px;flex-wrap:nowrap">
-              <i style="width:40px;height:56px;border-radius:5px;background:var(--grad);outline:2px solid var(--gold);outline-offset:2px"></i><i style="width:40px;height:56px;border-radius:5px;background:var(--surface-3)"></i><i style="width:40px;height:56px;border-radius:5px;background:var(--surface-3)"></i><i style="width:40px;height:56px;border-radius:5px;background:var(--surface-3)"></i>
-            </div>
-          </div>
+        <div class="step"><div class="n">2</div><h3>Grüner Rahmen</h3>
+          <p>Sobald die Karte <b>grün umrandet</b> ist, kurz stillhalten – Auto-Scan löst von selbst aus. Unscharf? Tippe auf die Karte zum Scharfstellen oder nutze <b>2×</b>-Zoom.</p>
         </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div>
-            <h3>Version wählen und Echtheit prüfen</h3>
-            <p>Wähle die richtige Version (z. B. <b>Normal, Holo, Reverse</b> oder die Seltenheit bei Yu-Gi-Oh!). Tippe auf <b>„Echtheit prüfen“</b>, um die Karte auf typische Fälschungsfehler zu testen.</p>
-          </div>
-          <div class="screen dark">
-            <div style="padding:10px;border-radius:10px;background:rgba(47,212,122,.12);color:var(--green);font-weight:800;margin-bottom:8px">✓ Keine Auffälligkeiten</div>
-            <div style="color:var(--soft);line-height:1.8">✓ Kartennummer<br>✓ KP &amp; Attacken</div>
-          </div>
+        <div class="step"><div class="n">3</div><h3>Preis und Echtheit</h3>
+          <p>Richtige Version wählen (Normal, Holo, Reverse). Mit <b>„Echtheit prüfen“</b> testest du die Karte auf typische Fälschungsfehler.</p>
         </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div>
-            <h3>Zur Sammlung hinzufügen</h3>
-            <p>Anzahl einstellen und auf <b>„Zur Sammlung hinzufügen“</b> tippen. Oben in der Sammlung wechselst du zwischen <b>Alle, Pokémon, Yu-Gi-Oh!, Fußball und Football</b>. Mit „Preise aktualisieren“ holst du die neuesten Preise.</p>
-          </div>
-          <div class="screen dark">
-            <div class="muted" style="font-weight:700;font-size:10px;letter-spacing:.08em">SAMMLUNGSWERT</div>
-            <div style="font-size:26px;font-weight:900">248,90 €</div>
-            <div style="display:flex;gap:4px;margin-top:8px;font-size:10px;font-weight:800"><span style="background:#fff;color:#000;padding:3px 8px;border-radius:99px">Alle</span><span style="padding:3px 8px;border:1px solid var(--line);border-radius:99px">Pokémon</span><span style="padding:3px 8px;border:1px solid var(--line);border-radius:99px">Fußball</span></div>
-          </div>
+        <div class="step"><div class="n">4</div><h3>Sammeln</h3>
+          <p><b>„Zur Sammlung hinzufügen“</b> – oben wechselst du zwischen Alle, Pokémon, Yu-Gi-Oh!, Fußball und Football.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <section id="faq">
+  <section class="block" id="faq" style="padding-top:20px">
     <div class="wrap">
-      <div class="head reveal">
-        <div class="eyebrow">Fragen</div>
-        <h2>Häufige Fragen</h2>
-      </div>
-      <div class="faq reveal">
-        <details>
-          <summary>Kostet CardVault etwas?</summary>
-          <p>Nein. Die App ist komplett kostenlos, ohne Werbung, ohne Abo und ohne Konto.</p>
-        </details>
-        <details>
-          <summary>Welche Karten werden unterstützt?</summary>
-          <p>Pokémon (deutsch und englisch, mit Cardmarket-Preisen) und Yu-Gi-Oh! (mit Marktpreisen je Druck). Fußball- und American-Football-Karten kannst du mit Foto, Spielername und eigenem Wert in deiner Sammlung speichern.</p>
-        </details>
-        <details>
-          <summary>Wie sicher ist der Echtheits-Check?</summary>
-          <p>Der Check vergleicht deinen Scan mit den Daten der echten Karte, also Nummer, Name, KP, Attacken, Bild und Farben, bei Yu-Gi-Oh! Set-Code und Passcode. So findet er typische Fehler von Fälschungen. Beweisen kann ein Handyfoto die Echtheit aber nicht. Bei wertvollen Karten solltest du zusätzlich den Lichttest machen oder die Karte von Profis prüfen lassen.</p>
-        </details>
-        <details>
-          <summary>Was mache ich, wenn eine falsche Karte erkannt wird?</summary>
-          <p>Unter „Nicht die richtige Karte?“ siehst du ähnliche Treffer. Ist sich die App unsicher, fragt sie dich von selbst. Besseres Licht, die Karte aus der glänzenden Hülle nehmen und das Handy gerade halten helfen sehr. Du kannst jede Karte auch über „Suchen“ finden.</p>
-        </details>
-        <details>
-          <summary>Woher kommen die Preise?</summary>
-          <p>Pokémon: Trendpreise von Cardmarket über die freie Datenbank TCGdex. Yu-Gi-Oh!: TCGplayer-Marktpreise über YGOPRODeck, umgerechnet in Euro mit dem Kurs der Europäischen Zentralbank. Alle Angaben ohne Gewähr. Der echte Verkaufspreis hängt auch vom Zustand der Karte ab.</p>
-        </details>
-        <details>
-          <summary>Warum ist die App nicht im Play Store?</summary>
-          <p>CardVault wird direkt als APK-Datei verteilt. So bleibt die App kostenlos und ist sofort verfügbar. Deshalb warnt Android bei der Installation, wie bei jeder App außerhalb des Play Stores.</p>
-        </details>
-        <details>
-          <summary>Gibt es CardVault auch für das iPhone?</summary>
-          <p>Ja, als Web-App. Auf dem iPhone kann man keine APK-Dateien installieren, deshalb läuft CardVault dort in Safari. Tippe auf „iPhone: App öffnen“ und lege die App über „Teilen“ → „Zum Home-Bildschirm“ ab. Dann startet sie wie eine normale App, mit Kamera, Erkennung und Sammlung.</p>
-        </details>
-        <details>
-          <summary>Werden meine Fotos hochgeladen?</summary>
-          <p>Nein. Die Texterkennung und der Bildvergleich laufen direkt auf deinem Handy. Ins Internet geht nur die Suche nach der Karte, um den Preis abzufragen. Deine Sammlung und deine Fotos bleiben auf deinem Handy.</p>
-        </details>
-        <details>
-          <summary>Wie bekomme ich Updates?</summary>
-          <p>Android: Lade die neueste APK von dieser Seite herunter und installiere sie über die alte Version. iPhone: Die Web-App aktualisiert sich von selbst. Deine Sammlung bleibt in beiden Fällen erhalten.</p>
-        </details>
+      <div class="block-head"><h2>Fragen</h2></div>
+      <div class="faq">
+        <details><summary>Kostet CardVault etwas?</summary><p>Nein. Die App ist komplett kostenlos, ohne Werbung, ohne Abo und ohne Konto.</p></details>
+        <details><summary>Wie funktioniert der Auto-Scan?</summary><p>Die Kamera sucht die Karte live im Bild und rahmt sie ein. Ist die Karte ruhig, scharf und groß genug, füllt sich der Ring am Auslöser und die App macht das Foto selbst. Danach liest sie Nummer und Name und vergleicht das Bild mit der Datenbank. Auto-Scan kannst du im Scanner ausschalten.</p></details>
+        <details><summary>Was mache ich, wenn eine falsche Karte erkannt wird?</summary><p>Ist sich die App unsicher, zeigt sie dir die besten Treffer zur Auswahl. Unter „Nicht die richtige Karte?“ findest du Alternativen. Am besten klappt es mit dunklem Untergrund, gutem Licht und ohne glänzende Hülle.</p></details>
+        <details><summary>Wie sicher ist der Echtheits-Check?</summary><p>Der Check vergleicht deinen Scan mit den Daten der echten Karte und findet typische Fehler von Fälschungen. Beweisen kann ein Handyfoto die Echtheit aber nicht. Bei wertvollen Karten: zusätzlich Lichttest oder Profis (z. B. PSA, CGC).</p></details>
+        <details><summary>Gibt es CardVault fürs iPhone?</summary><p>Ja, als Web-App. Auf dem iPhone kann man keine APK installieren und eine App-Store-Version kostet 99 $ pro Jahr. Über „Teilen“ → „Zum Home-Bildschirm“ startet CardVault aber wie eine normale App.</p></details>
+        <details><summary>Woher kommen die Preise?</summary><p>Pokémon: Cardmarket-Trendpreise über TCGdex. Yu-Gi-Oh!: TCGplayer-Marktpreise über YGOPRODeck, mit dem EZB-Kurs in Euro umgerechnet. Sportkarten: dein eigener Wert. Alle Angaben ohne Gewähr.</p></details>
+        <details><summary>Werden meine Fotos hochgeladen?</summary><p>Nein. Kamera-Erkennung, Texterkennung und Bildvergleich laufen direkt auf deinem Handy. Ins Internet geht nur die Suche nach Karte und Preis.</p></details>
+        <details><summary>Wie bekomme ich Updates?</summary><p>Android: neue APK laden und über die alte installieren. iPhone: Die Web-App aktualisiert sich selbst. Die Sammlung bleibt in beiden Fällen.</p></details>
       </div>
     </div>
   </section>
-
-  <div class="wrap">
-    <div class="cta reveal">
-      <div class="fan" aria-hidden="true">
-        <i style="background:linear-gradient(160deg,#4c8dff,#233c7a);transform:rotate(-14deg) translateY(8px)"></i>
-        <i style="background:linear-gradient(160deg,#9b6bff,#4a2d8a);transform:rotate(-5deg)"></i>
-        <i style="background:var(--grad);transform:translateY(-6px);z-index:1"></i>
-        <i style="background:linear-gradient(160deg,#2fd47a,#12804a);transform:rotate(5deg)"></i>
-        <i style="background:linear-gradient(160deg,#ff5470,#7a2337);transform:rotate(14deg) translateY(8px)"></i>
-      </div>
-      <h2>Bereit, deine Sammlung zu bewerten?</h2>
-      <p>Kostenlos für Android und iPhone. Keine Anmeldung nötig.</p>
-      <div class="cta-row" style="justify-content:center">
-        <a class="btn primary big" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Android: APK laden</a>
-        <a class="btn ghost big" href="app/"><svg class="i" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg> iPhone: App öffnen</a>
-      </div>
-    </div>
-  </div>
 
   <footer>
     <div class="wrap">
-      <div><b style="color:var(--text)">CardVault</b> · Version 1.1.1</div>
-      <div>CardVault ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu Nintendo, Creatures Inc., GAME FREAK inc., The Pokémon Company, Konami, Panini oder Topps. Alle Marken gehören ihren jeweiligen Inhabern.</div>
-      <div>Preisdaten: Cardmarket über TCGdex, TCGplayer über YGOPRODeck, Wechselkurs der EZB. Alle Angaben ohne Gewähr.</div>
+      <div class="foot-word">CardVault</div>
+      <div class="foot-row">
+        <div class="links"><a href="#kamera">Kamera</a><a href="#echtheit">Echtheit</a><a href="#tutorial">Tutorial</a><a href="#faq">Fragen</a><a href="#download">Download</a></div>
+        <div>Version 1.2.0</div>
+      </div>
+      <p class="legal">CardVault ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu Nintendo, Creatures Inc., GAME FREAK inc., The Pokémon Company, Konami, Panini, Topps oder Rockstar Games. Alle Marken gehören ihren jeweiligen Inhabern. Preisdaten: Cardmarket über TCGdex, TCGplayer über YGOPRODeck, Wechselkurs der EZB – ohne Gewähr.</p>
     </div>
   </footer>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <script>
+    // Navigation wird beim Scrollen schwarz
+    const nav = document.getElementById('nav');
+    const onScroll = () => nav.classList.toggle('solid', scrollY > 40);
+    addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+
+    // Bildwechsler im Titelbild (7 Sekunden pro Bild, anhaltbar)
+    const hero = document.getElementById('top');
+    const slides = [...hero.querySelectorAll('.slide')];
+    const bars = [...document.querySelectorAll('#bars .bar')];
+    let idx = 0;
+    const show = i => {
+      idx = (i + slides.length) % slides.length;
+      slides.forEach((s, k) => s.classList.toggle('on', k === idx));
+      bars.forEach((b, k) => { b.classList.toggle('on', k === idx); b.classList.toggle('done', k < idx); const fill = b.querySelector('i'); fill.style.animation = 'none'; void fill.offsetWidth; fill.style.animation = ''; });
+    };
+    bars.forEach((b, k) => {
+      b.addEventListener('click', () => show(k));
+      b.querySelector('i').addEventListener('animationend', () => { if (k === idx) show(idx + 1); });
+    });
+    const pause = document.getElementById('pause');
+    const setPaused = p => {
+      hero.classList.toggle('paused', p);
+      pause.setAttribute('aria-label', p ? 'Bildwechsel fortsetzen' : 'Bildwechsel anhalten');
+      pause.innerHTML = p ? '<svg viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg>' : '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+    };
+    pause.addEventListener('click', () => setPaused(!hero.classList.contains('paused')));
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) setPaused(true);
+
     // Tutorial-Tabs
     document.querySelectorAll('.tabs button').forEach(btn => btn.addEventListener('click', () => {
       document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b === btn));
-      document.querySelectorAll('[data-panel]').forEach(p => {
-        p.hidden = p.dataset.panel !== btn.dataset.tab;
-        p.querySelectorAll('.reveal').forEach(el => el.classList.add('in'));
-      });
+      document.querySelectorAll('[data-panel]').forEach(p => { p.hidden = p.dataset.panel !== btn.dataset.tab; });
     }));
 
-    // Auf dem iPhone den iPhone-Knopf zuerst und hervorgehoben zeigen
+    // Auf dem iPhone: iPhone-Knöpfe zuerst und hervorgehoben, Tutorial-Reiter „iPhone“
     if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      document.querySelectorAll('[data-get="iphone"]').forEach(a => a.remove());
+      document.querySelectorAll('[data-get="android"]').forEach(a => { a.href = 'app/'; a.removeAttribute('download'); a.lastChild.textContent = 'Fürs iPhone'; });
       const row = document.getElementById('get-row');
-      const ios = document.getElementById('get-iphone'), android = document.getElementById('get-android');
+      const ios = document.getElementById('get-iphone');
       row.prepend(ios);
-      ios.classList.replace('ghost', 'primary');
-      android.classList.replace('primary', 'ghost');
+      ios.classList.replace('outline', 'white');
+      document.getElementById('get-android').classList.replace('white', 'outline');
       document.querySelector('[data-tab="iphone"]').click();
     }
 
@@ -756,12 +588,6 @@
         document.getElementById('qr').hidden = false;
       }
     } catch (e) { /* ohne QR-Code weiter */ }
-
-    // Elemente beim Scrollen einblenden
-    const io = 'IntersectionObserver' in window
-      ? new IntersectionObserver(entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } }), { threshold: .12 })
-      : null;
-    document.querySelectorAll('.reveal').forEach(el => io ? io.observe(el) : el.classList.add('in'));
   </script>
 </body>
 </html>
