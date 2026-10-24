@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0b0d12">
+  <title>CardVault</title>
+  <link rel="icon" href="img/icon.svg">
+  <!-- Als Web-App auf dem iPhone-Home-Bildschirm -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CardVault">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="app">
+    <main>
+      <!-- Sammlung -->
+      <section id="view-collection" class="view active" data-view="collection">
+        <header class="topbar">
+          <div class="brand"><img src="img/icon.svg" alt=""><span>CardVault</span></div>
+          <button class="icon-btn" id="btn-settings" aria-label="Einstellungen">
+            <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.35a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.54 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9c.26.6.85 1 1.51 1.03H21a2 2 0 1 1 0 4h-.09c-.66.03-1.25.43-1.51 1.03Z"/></svg>
+          </button>
+        </header>
+
+        <div class="value-card">
+          <div class="value-label" id="value-label">Sammlungswert</div>
+          <div class="value-amount" id="total-value">0,00 €</div>
+          <div class="value-meta">
+            <span id="total-count">0 Karten</span>
+            <span class="dot">·</span>
+            <span id="total-change" class="change"></span>
+          </div>
+          <button class="chip-btn" id="btn-refresh">
+            <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+            <span>Preise aktualisieren</span>
+          </button>
+        </div>
+
+        <div class="chips" id="game-chips">
+          <button class="chip on" data-game="all">Alle <span></span></button>
+          <button class="chip" data-game="pokemon">Pokémon <span></span></button>
+          <button class="chip" data-game="yugioh">Yu-Gi-Oh! <span></span></button>
+          <button class="chip" data-game="soccer">Fußball <span></span></button>
+          <button class="chip" data-game="football">Football <span></span></button>
+        </div>
+
+        <div class="toolbar" id="collection-toolbar" hidden>
+          <div class="input-wrap">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="collection-filter" type="search" placeholder="In Sammlung suchen" autocomplete="off">
+          </div>
+          <select id="collection-sort" aria-label="Sortieren">
+            <option value="value">Wert ↓</option>
+            <option value="added">Neueste</option>
+            <option value="name">Name A–Z</option>
+            <option value="set">Set</option>
+          </select>
+        </div>
+
+        <div id="collection-grid" class="grid"></div>
+
+        <div id="collection-empty" class="empty">
+          <div class="empty-art">
+            <div class="ghost-card c1"></div><div class="ghost-card c2"></div><div class="ghost-card c3"></div>
+          </div>
+          <h2>Deine Sammlung ist leer</h2>
+          <p id="empty-text">Scanne deine erste Karte – Pokémon, Yu-Gi-Oh!, Fußball oder Football.</p>
+          <button class="btn primary" data-goto="scan">Erste Karte scannen</button>
+        </div>
+      </section>
+
+      <!-- Scanner -->
+      <section id="view-scan" class="view" data-view="scan">
+        <div class="scanner">
+          <video id="video" playsinline muted autoplay></video>
+          <div class="scan-mask">
+            <div class="scan-frame" id="scan-frame">
+              <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
+              <div class="scan-line"></div>
+              <div class="zone zone-name" id="zone-name">Name</div>
+              <div class="zone zone-number" id="zone-number">Nr. 025/165</div>
+            </div>
+          </div>
+          <header class="scan-top">
+            <button class="icon-btn glass" data-goto="collection" aria-label="Schließen">
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+            <div class="scan-title">Karte scannen</div>
+            <button class="icon-btn glass" id="btn-torch" aria-label="Taschenlampe" hidden>
+              <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+            </button>
+          </header>
+          <div class="mode-switch" id="scan-mode">
+            <button data-mode="pokemon" class="on">Pokémon</button>
+            <button data-mode="yugioh">Yu-Gi-Oh!</button>
+            <button data-mode="sport">Sport</button>
+          </div>
+          <div class="scan-hint" id="scan-hint">Karte in den Rahmen legen – die Nummer unten muss lesbar sein</div>
+          <div class="scan-controls">
+            <button class="icon-btn glass lg" id="btn-gallery" aria-label="Foto wählen">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            </button>
+            <button class="shutter" id="btn-shutter" aria-label="Scannen"><span></span></button>
+            <button class="icon-btn glass lg" data-goto="search" aria-label="Manuell suchen">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            </button>
+          </div>
+          <div class="scan-status" id="scan-status" hidden>
+            <div class="spinner"></div>
+            <div class="scan-status-text" id="scan-status-text">Karte wird erkannt …</div>
+            <div class="progress"><div id="scan-progress"></div></div>
+          </div>
+          <div class="camera-error" id="camera-error" hidden>
+            <svg viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"/><circle cx="12" cy="13" r="4"/><path d="M2 2l20 20"/></svg>
+            <h3>Kamera nicht verfügbar</h3>
+            <p id="camera-error-text">Bitte erlaube den Kamerazugriff oder wähle ein Foto aus deiner Galerie.</p>
+            <div class="row">
+              <button class="btn secondary" id="btn-camera-retry">Erneut versuchen</button>
+              <button class="btn primary" id="btn-gallery-2">Foto wählen</button>
+            </div>
+          </div>
+        </div>
+        <input type="file" accept="image/*" id="file-input" hidden>
+        <input type="file" accept="image/*" id="sport-photo-input" hidden>
+      </section>
+
+      <!-- Suche -->
+      <section id="view-search" class="view" data-view="search">
+        <header class="topbar">
+          <h1>Karte suchen</h1>
+        </header>
+        <div class="segmented wide" id="search-game">
+          <button data-game="pokemon" class="on">Pokémon</button>
+          <button data-game="yugioh">Yu-Gi-Oh!</button>
+          <button data-game="sport">Sport</button>
+        </div>
+        <div id="sport-panel" class="sport-panel" hidden>
+          <div class="sport-icon">⚽🏈</div>
+          <h2>Fußball- &amp; Football-Karten</h2>
+          <p>Für Sportkarten gibt es keine freie Preisdatenbank. Füge sie mit Foto hinzu und trag ihren Wert selbst ein.</p>
+          <div class="actions">
+            <button class="btn secondary" data-add-sport="soccer">⚽ Fußball</button>
+            <button class="btn secondary" data-add-sport="football">🏈 Football</button>
+          </div>
+          <p class="search-tip">Tipp: Im Scanner unter „Sport“ fotografierst du die Karte und die App liest den Namen vor.</p>
+        </div>
+        <form id="search-form" class="search-form" autocomplete="off">
+          <div class="input-wrap big">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+            <input id="search-input" type="search" placeholder="Name, z. B. Glurak oder Pikachu 025" enterkeyhint="search">
+          </div>
+        </form>
+        <p class="search-tip" id="search-tip">Tipp: Name und Nummer kombinieren, z. B. <b>Pikachu 25</b></p>
+        <div id="search-results" class="grid"></div>
+        <div id="search-empty" class="empty small" hidden>
+          <h2>Nichts gefunden</h2>
+          <p>Prüfe die Schreibweise oder versuche den englischen Namen.</p>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabbar">
+      <button class="tab active" data-goto="collection">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span>Sammlung</span>
+      </button>
+      <button class="tab tab-scan" data-goto="scan" aria-label="Scannen">
+        <span class="scan-fab">
+          <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 12h10"/></svg>
+        </span>
+      </button>
+      <button class="tab" data-goto="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <span>Suchen</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- Bottom-Sheet (Kartendetails / Treffer) -->
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true">
+      <div class="sheet-handle" data-close></div>
+      <div id="sheet-body"></div>
+    </div>
+  </div>
+
+  <!-- Einstellungen -->
+  <div id="settings" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true">
+      <div class="sheet-handle" data-close></div>
+      <h2 class="sheet-title">Einstellungen</h2>
+      <div class="list">
+        <div class="list-item">
+          <div><b>Sprache der Kartennamen</b><small>Für Suche und Anzeige</small></div>
+          <div class="segmented" id="lang-switch">
+            <button data-lang="de">DE</button><button data-lang="en">EN</button>
+          </div>
+        </div>
+        <button class="list-item" id="btn-tutorial">
+          <div><b>Tutorial ansehen</b><small>So funktioniert CardVault</small></div>
+          <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <button class="list-item danger" id="btn-clear">
+          <div><b>Sammlung leeren</b><small id="clear-hint">Entfernt alle Karten auf diesem Gerät</small></div>
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+        </button>
+      </div>
+      <p class="fineprint">
+        Pokémon-Preise: Cardmarket-Trendpreise über <b>TCGdex</b>. Yu-Gi-Oh!-Preise: TCGplayer-Marktpreise über <b>YGOPRODeck</b>, umgerechnet mit dem EZB-Kurs. Sportkarten: dein eigener Wert. Alle Angaben ohne Gewähr.<br>
+        Der Echtheits-Check gibt Hinweise, ist aber keine Garantie.<br>
+        CardVault ist ein inoffizielles Fan-Projekt und steht in keiner Verbindung zu Nintendo, Creatures, GAME FREAK, The Pokémon Company, Konami, Panini oder Topps.<br>
+        Version 1.1.1
+      </p>
+    </div>
+  </div>
+
+  <!-- Tutorial -->
+  <div id="onboarding" class="onboarding" hidden>
+    <button class="skip" id="ob-skip">Überspringen</button>
+    <div class="ob-track" id="ob-track">
+      <div class="ob-slide">
+        <div class="ob-art art-welcome">
+          <div class="fan f1"></div><div class="fan f2"></div><div class="fan f3"></div>
+        </div>
+        <h2>Willkommen bei CardVault</h2>
+        <p>Scanne deine Karten und erfahre in Sekunden, was sie wert sind – <b>Pokémon, Yu-Gi-Oh!, Fußball und Football</b>.</p>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art art-scan">
+          <div class="mini-frame"><div class="mini-card"><span class="mini-num">025/165</span></div><div class="mini-line"></div></div>
+        </div>
+        <h2>1. Karte scannen</h2>
+        <p>Tippe unten auf den gelben Knopf und wähle oben die Kartenart. Halte die Karte gerade in den Rahmen – <b>Nummer bzw. Set-Code</b> müssen gut lesbar sein. Ist sich die App nicht sicher, zeigt sie dir mehrere Treffer zur Auswahl.</p>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art art-price">
+          <div class="price-pill">
+            <small>Trendpreis</small><b>12,40 €</b>
+          </div>
+          <div class="variant-row"><span class="on">Normal</span><span>Holo</span><span>Reverse</span></div>
+        </div>
+        <h2>2. Preis prüfen</h2>
+        <p>Wähle die richtige Version: Normal, Holo oder Reverse Holo. Der Preis kommt live von Cardmarket.</p>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art art-fake">
+          <div class="shield">✓</div>
+          <div class="check-row"><i class="ok"></i>Kartennummer</div>
+          <div class="check-row"><i class="ok"></i>KP &amp; Attacken</div>
+          <div class="check-row"><i class="warn"></i>Farben</div>
+        </div>
+        <h2>3. Echt oder Fake?</h2>
+        <p>Nach dem Scan tippst du auf <b>„Echtheit prüfen“</b>. Die App vergleicht Nummer, Name, KP, Attacken und Bild mit der echten Karte und gibt dir Tipps für den Lichttest.</p>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art art-collection">
+          <div class="stack-value">Sammlungswert<b>248,90 €</b></div>
+          <div class="mini-grid"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </div>
+        <h2>4. Sammlung aufbauen</h2>
+        <p>Alle Karten landen in deiner Sammlung – sortiert nach Pokémon, Yu-Gi-Oh!, Fußball und Football, mit Gesamtwert und Preisentwicklung.</p>
+      </div>
+    </div>
+    <div class="ob-footer">
+      <div class="dots" id="ob-dots"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+      <button class="btn primary wide" id="ob-next">Weiter</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="vendor/tesseract/tesseract.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

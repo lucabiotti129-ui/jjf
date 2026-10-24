@@ -7,7 +7,7 @@
   <title>CardVault – Karten scannen, Wert erfahren, Fälschungen erkennen</title>
   <meta name="description" content="Scanne Pokémon-, Yu-Gi-Oh!-, Fußball- und Football-Karten mit dem Handy. Live-Preise, Echtheits-Check und deine Sammlung mit Gesamtwert. Kostenlose Android-App.">
   <meta property="og:title" content="CardVault – Karten scannen & Wert erfahren">
-  <meta property="og:description" content="Pokémon, Yu-Gi-Oh!, Fußball & Football: scannen, Preis sehen, Echtheit prüfen. Kostenlos für Android.">
+  <meta property="og:description" content="Pokémon, Yu-Gi-Oh!, Fußball & Football: scannen, Preis sehen, Echtheit prüfen. Kostenlos für Android und iPhone.">
   <link rel="icon" href="icon.svg">
   <style>
     :root {
@@ -61,6 +61,8 @@
     .btn:active { transform: scale(.98); }
     .btn.primary { background: var(--grad); color: #1d1300; box-shadow: 0 14px 34px -12px rgba(255,150,0,.75), inset 0 1px 0 rgba(255,255,255,.5); }
     .btn.primary:hover { box-shadow: 0 18px 44px -12px rgba(255,150,0,.9), inset 0 1px 0 rgba(255,255,255,.5); }
+    .btn.ghost { background: rgba(255,255,255,.06); border: 1px solid var(--line-2); color: var(--text); box-shadow: none; }
+    .btn.ghost:hover { background: rgba(255,255,255,.1); }
     .btn.small { height: 42px; padding: 0 18px; font-size: 15px; border-radius: 12px; }
     .btn.big { height: 64px; padding: 0 34px; font-size: 19px; border-radius: 20px; }
     .btn .sub { display: block; font-size: 12px; font-weight: 600; opacity: .7; margin-top: -2px; }
@@ -92,6 +94,16 @@
     .qr-code svg { width: 100%; height: 100%; display: block; }
     .qr small { color: var(--muted); font-size: 13px; line-height: 1.4; display: block; max-width: 140px; }
     .qr b { font-size: 14px; }
+    .qr-pair { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; }
+    .qr-item {
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px 10px 10px; border-radius: 18px;
+      background: var(--surface); border: 1px solid var(--line);
+    }
+    .qr-item small { color: var(--muted); font-size: 13px; line-height: 1.4; display: block; max-width: 150px; }
+    .qr-item b { font-size: 15px; display: flex; align-items: center; gap: 6px; }
+    .qr-item b svg { width: 18px; height: 18px; }
+    .share-ic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #e8f0fe; color: #1a73e8; vertical-align: -5px; }
+    .share-ic svg { width: 15px; height: 15px; }
     .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 22px; color: var(--muted); font-size: 14px; }
     .meta span { display: inline-flex; align-items: center; gap: 6px; }
     .meta svg { width: 16px; height: 16px; color: var(--green); }
@@ -238,7 +250,7 @@
       .hero .wrap { grid-template-columns: 1fr; text-align: center; }
       .hero p.lead, .ios-note { margin-inline: auto; }
       .games, .cta-row, .meta { justify-content: center; }
-      .qr { display: none; }
+      .qr, .qr-pair { display: none; }
       .stage { justify-self: center; max-width: 470px; }
       .stats { grid-template-columns: 1fr 1fr; margin-top: 0; }
       .flow { grid-template-columns: 1fr; }
@@ -283,7 +295,7 @@
     <div class="glow" style="width:420px;height:420px;background:#4c8dff;left:-180px;bottom:-120px;opacity:.22"></div>
     <div class="wrap">
       <div>
-        <div class="pill"><b>NEU 1.1</b> Yu-Gi-Oh!, Sportkarten &amp; Echtheits-Check</div>
+        <div class="pill"><b>NEU</b> Jetzt auch fürs iPhone · Yu-Gi-Oh! · Echtheits-Check</div>
         <h1>Scanne deine Karten.<br><span class="grad-text">Kenne ihren Wert.</span></h1>
         <p class="lead">Halte die Karte vor die Kamera und CardVault erkennt sie in Sekunden. Du siehst den aktuellen Marktpreis, kannst prüfen, ob sie echt ist, und baust deine Sammlung mit Gesamtwert auf.</p>
         <div class="games">
@@ -292,24 +304,31 @@
           <span class="game"><i style="background:#2fd47a"></i>Fußball</span>
           <span class="game"><i style="background:#ff5470"></i>American Football</span>
         </div>
-        <div class="cta-row">
-          <a class="btn primary big" href="CardVault.apk" download>
+        <div class="cta-row" id="get-row">
+          <a class="btn primary big" id="get-android" href="CardVault.apk" download>
             <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-            <span class="two">APK herunterladen<span class="sub">Android · Version 1.1.1 · kostenlos</span></span>
+            <span class="two">Android: APK laden<span class="sub">Version 1.1.1 · kostenlos</span></span>
           </a>
-          <div class="qr" id="qr" hidden>
-            <div class="qr-code" id="qr-code"></div>
-            <div><b>Am PC?</b><small>Scanne den Code mit deinem Handy, um die App dort zu laden.</small></div>
+          <a class="btn ghost big" id="get-iphone" href="app/">
+            <svg class="i" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>
+            <span class="two">iPhone: App öffnen<span class="sub">Web-App für Safari · kostenlos</span></span>
+          </a>
+        </div>
+        <div class="qr-pair" id="qr" hidden>
+          <div class="qr-item">
+            <div class="qr-code" id="qr-android"></div>
+            <div><b>Android</b><small>Mit dem Handy scannen und die APK laden</small></div>
+          </div>
+          <div class="qr-item">
+            <div class="qr-code" id="qr-iphone"></div>
+            <div><b>iPhone</b><small>Mit der Kamera scannen und in Safari öffnen</small></div>
           </div>
         </div>
         <div class="meta">
-          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Ab Android 7</span>
+          <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Android &amp; iPhone</span>
           <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Keine Anmeldung</span>
           <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Keine Werbung</span>
           <span><svg class="i" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Erkennung direkt auf dem Handy</span>
-        </div>
-        <div class="ios-note" id="ios-note" hidden>
-          Du bist auf einem iPhone. CardVault gibt es im Moment nur für Android, denn auf dem iPhone lassen sich keine APK-Dateien installieren.
         </div>
       </div>
 
@@ -443,8 +462,9 @@
       </div>
 
       <div class="tabs" role="tablist">
-        <button class="on" data-tab="install" role="tab">1. Installieren</button>
-        <button data-tab="use" role="tab">2. Benutzen</button>
+        <button class="on" data-tab="install" role="tab">Android installieren</button>
+        <button data-tab="iphone" role="tab">iPhone einrichten</button>
+        <button data-tab="use" role="tab">Benutzen</button>
       </div>
 
       <div class="steps" data-panel="install">
@@ -518,6 +538,57 @@
               <span class="pill2 ghost" style="text-align:center">Nicht zulassen</span>
             </div>
             <span class="tap" style="left:46%;top:62px"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="steps" data-panel="iphone" hidden>
+        <div class="step">
+          <div class="step-num">1</div>
+          <div>
+            <h3>In Safari öffnen</h3>
+            <p>Öffne diese Seite auf deinem iPhone in <b>Safari</b> und tippe auf <b>„iPhone: App öffnen“</b>. Am PC kannst du auch den iPhone-QR-Code oben mit der Kamera-App scannen.</p>
+            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Auf dem iPhone gibt es keine APK. CardVault läuft dort als Web-App, mit Kamera, Erkennung und Sammlung.</div>
+          </div>
+          <div class="screen">
+            <div class="title">lucabiotti129-ui.github.io</div>
+            <div style="padding:10px;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);display:flex;gap:8px;align-items:center"><img src="icon.svg" alt="" style="width:28px;height:28px"><b>iPhone: App öffnen</b></div>
+            <span class="tap" style="left:45%;top:60px"></span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div>
+            <h3>Auf „Teilen“ tippen</h3>
+            <p>Tippe in Safari unten in der Leiste auf das <b>Teilen-Symbol</b> <span class="share-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span> (ein Quadrat mit Pfeil nach oben).</p>
+          </div>
+          <div class="screen" style="display:flex;align-items:flex-end;justify-content:center">
+            <div style="display:flex;gap:26px;padding:10px 18px;border-radius:14px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.08);color:#1a73e8;font-size:18px">‹ › <span class="share-ic"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M8 7l4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg></span> ⧉</div>
+            <span class="tap" style="left:49%;bottom:16px"></span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div>
+            <h3>„Zum Home-Bildschirm“ wählen</h3>
+            <p>Scrolle in der Liste etwas nach unten und tippe auf <b>„Zum Home-Bildschirm“</b>. Danach oben rechts auf <b>„Hinzufügen“</b>.</p>
+          </div>
+          <div class="screen">
+            <div class="row" style="padding:8px 10px;border-radius:10px;background:#fff;margin-bottom:6px"><span>Zur Leseliste</span><span class="muted">○○</span></div>
+            <div class="row" style="padding:8px 10px;border-radius:10px;background:#fff;font-weight:800"><span>Zum Home-Bildschirm</span><span>⊞</span></div>
+            <span class="tap" style="left:40%;top:56px"></span>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div>
+            <h3>App starten und Kamera erlauben</h3>
+            <p>Jetzt ist <b>CardVault</b> auf deinem Home-Bildschirm. Öffne die App von dort und tippe beim ersten Scan auf <b>„Erlauben“</b> für die Kamera. Fertig! 🎉</p>
+            <div class="tip"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Öffne CardVault immer über das Symbol auf dem Home-Bildschirm. Dort bleibt deine Sammlung dauerhaft gespeichert, und Updates kommen automatisch.</div>
+          </div>
+          <div class="screen dark" style="display:grid;place-items:center">
+            <div style="text-align:center"><img src="icon.svg" alt="" style="width:54px;height:54px;border-radius:14px;margin:0 auto 6px"><b style="font-size:12px">CardVault</b></div>
+            <span class="tap" style="left:45%;top:38px"></span>
           </div>
         </div>
       </div>
@@ -610,7 +681,7 @@
         </details>
         <details>
           <summary>Gibt es CardVault auch für das iPhone?</summary>
-          <p>Im Moment leider nicht. Auf dem iPhone kann man keine APK-Dateien installieren, und Apps dürfen dort nur über den App Store verteilt werden.</p>
+          <p>Ja, als Web-App. Auf dem iPhone kann man keine APK-Dateien installieren, deshalb läuft CardVault dort in Safari. Tippe auf „iPhone: App öffnen“ und lege die App über „Teilen“ → „Zum Home-Bildschirm“ ab. Dann startet sie wie eine normale App, mit Kamera, Erkennung und Sammlung.</p>
         </details>
         <details>
           <summary>Werden meine Fotos hochgeladen?</summary>
@@ -618,7 +689,7 @@
         </details>
         <details>
           <summary>Wie bekomme ich Updates?</summary>
-          <p>Lade die neueste APK von dieser Seite herunter und installiere sie über die alte Version. Deine Sammlung bleibt dabei erhalten.</p>
+          <p>Android: Lade die neueste APK von dieser Seite herunter und installiere sie über die alte Version. iPhone: Die Web-App aktualisiert sich von selbst. Deine Sammlung bleibt in beiden Fällen erhalten.</p>
         </details>
       </div>
     </div>
@@ -634,11 +705,11 @@
         <i style="background:linear-gradient(160deg,#ff5470,#7a2337);transform:rotate(14deg) translateY(8px)"></i>
       </div>
       <h2>Bereit, deine Sammlung zu bewerten?</h2>
-      <p>Kostenlos für Android. Keine Anmeldung nötig.</p>
-      <a class="btn primary big" href="CardVault.apk" download>
-        <svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-        APK herunterladen
-      </a>
+      <p>Kostenlos für Android und iPhone. Keine Anmeldung nötig.</p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn primary big" href="CardVault.apk" download><svg class="i" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg> Android: APK laden</a>
+        <a class="btn ghost big" href="app/"><svg class="i" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg> iPhone: App öffnen</a>
+      </div>
     </div>
   </div>
 
@@ -661,16 +732,27 @@
       });
     }));
 
-    // Hinweis für iPhone-Besucher
-    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) document.getElementById('ios-note').hidden = false;
+    // Auf dem iPhone den iPhone-Knopf zuerst und hervorgehoben zeigen
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      const row = document.getElementById('get-row');
+      const ios = document.getElementById('get-iphone'), android = document.getElementById('get-android');
+      row.prepend(ios);
+      ios.classList.replace('ghost', 'primary');
+      android.classList.replace('primary', 'ghost');
+      document.querySelector('[data-tab="iphone"]').click();
+    }
 
-    // QR-Code für Besucher am PC (zeigt auf genau diese Seite)
+    // Zwei QR-Codes für Besucher am PC: Android lädt die APK, iPhone öffnet die Web-App
     try {
       if (window.qrcode && !/Android|iPhone|iPad/.test(navigator.userAgent)) {
-        const qr = qrcode(0, 'M');
-        qr.addData(location.href.split('#')[0]);
-        qr.make();
-        document.getElementById('qr-code').innerHTML = qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+        const draw = (id, url) => {
+          const qr = qrcode(0, 'M');
+          qr.addData(new URL(url, location.href).href);
+          qr.make();
+          document.getElementById(id).innerHTML = qr.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+        };
+        draw('qr-android', 'CardVault.apk');
+        draw('qr-iphone', 'app/');
         document.getElementById('qr').hidden = false;
       }
     } catch (e) { /* ohne QR-Code weiter */ }
